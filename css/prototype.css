@@ -169,6 +169,33 @@ select:focus-visible,
   background: #e8efff;
 }
 
+.view-nav {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 2px;
+  margin-bottom: 1.5rem;
+  padding: 2px;
+  border-radius: 4px;
+  background: var(--boardstat-border);
+}
+
+.view-nav button {
+  min-height: 50px;
+  padding: 0.65rem 0.75rem;
+  border: 0;
+  color: var(--boardstat-navy);
+  background: #fff;
+  font-size: 0.86rem;
+  font-weight: 700;
+  text-align: left;
+}
+
+.view-nav button:hover,
+.view-nav button[aria-selected="true"] {
+  color: #fff;
+  background: var(--boardstat-blue);
+}
+
 .filter-card,
 .dashboard-card {
   border: 1px solid var(--boardstat-border);
@@ -180,6 +207,53 @@ select:focus-visible,
 .filter-card {
   margin-bottom: 1.5rem;
   padding: 1.25rem;
+}
+
+.filter-card > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.filter-card > summary::-webkit-details-marker {
+  display: none;
+}
+
+.filter-card > summary .eyebrow {
+  display: block;
+}
+
+.filter-card > summary::after {
+  content: "+";
+  color: var(--boardstat-blue);
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+
+.filter-card[open] > summary::after {
+  content: "−";
+}
+
+.filter-content {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--boardstat-border);
+}
+
+.filter-count {
+  margin-left: auto;
+  color: var(--boardstat-ink-muted);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.filter-help {
+  max-width: 720px;
+  margin: 0;
+  color: var(--boardstat-ink-muted);
 }
 
 .section-heading,
@@ -213,10 +287,120 @@ select:focus-visible,
   background: var(--boardstat-blue);
 }
 
-.filter-grid {
+.filter-grid,
+.date-filter-grid {
   display: grid;
   grid-template-columns: minmax(220px, 1.5fr) repeat(2, minmax(165px, 1fr));
   gap: 1rem;
+}
+
+.date-filter-grid {
+  grid-template-columns: repeat(2, minmax(180px, 260px));
+  margin-bottom: 1rem;
+}
+
+.filter-option-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.filter-group {
+  min-width: 0;
+  margin: 0;
+  padding: 1rem;
+  border: 1px solid var(--boardstat-border);
+  border-radius: 3px;
+}
+
+.filter-group legend {
+  width: auto;
+  margin: 0;
+  padding: 0;
+  color: var(--boardstat-navy);
+  background: transparent;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.filter-group > .text-button {
+  float: right;
+  margin-top: -1.6rem;
+}
+
+.text-button {
+  padding: 0.15rem 0.25rem;
+  border: 0;
+  color: var(--boardstat-bright-blue);
+  background: transparent;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: underline;
+}
+
+.option-search,
+#address-search {
+  width: 100%;
+  min-height: 42px;
+  margin: 0.65rem 0 0.5rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid #6c7890;
+  border-radius: 2px;
+  color: var(--boardstat-navy);
+  background: #fff;
+}
+
+.checkbox-options {
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--boardstat-border);
+  background: #fff;
+}
+
+.checkbox-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.45rem 0.55rem;
+  border-bottom: 1px solid #edf0f5;
+  cursor: pointer;
+  font-size: 0.84rem;
+}
+
+.checkbox-option:hover {
+  background: #f2f6ff;
+}
+
+.checkbox-option input {
+  flex: 0 0 auto;
+  margin-top: 0.2rem;
+}
+
+.checkbox-option span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.checkbox-option small {
+  margin-left: auto;
+  color: var(--boardstat-ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.compact-options {
+  max-height: 168px;
+}
+
+.option-note,
+.filter-options-status {
+  margin: 0.45rem 0 0;
+  color: var(--boardstat-ink-muted);
+  font-size: 0.82rem;
+}
+
+.filter-options-status {
+  min-height: 1.25rem;
 }
 
 .form-field label {
@@ -259,6 +443,20 @@ select:focus-visible,
   gap: 1.25rem;
 }
 
+.view-panel {
+  margin-top: 1.25rem;
+}
+
+.guidance-card h3 {
+  margin-top: 1.5rem;
+  font-size: 1.05rem;
+}
+
+.active-filter-list {
+  padding-left: 1.25rem;
+  color: var(--boardstat-ink-muted);
+}
+
 .dashboard-card {
   position: relative;
   min-width: 0;
@@ -291,10 +489,18 @@ select:focus-visible,
   letter-spacing: -0.05em;
 }
 
+#average-days {
+  font-size: clamp(2.6rem, 6vw, 4.5rem);
+}
+
 .chart-wrap {
   position: relative;
   min-height: 330px;
   margin-top: 1rem;
+}
+
+.chart-wrap-large {
+  min-height: 440px;
 }
 
 .chart-summary {
@@ -335,6 +541,97 @@ select:focus-visible,
   margin: 0.15rem 0;
 }
 
+.address-search-card {
+  margin-bottom: 1.25rem;
+}
+
+.address-search-card > label {
+  display: block;
+  margin-top: 1rem;
+  font-weight: 700;
+}
+
+.address-suggestions {
+  max-height: 260px;
+  margin: 0.5rem 0 1rem;
+  padding: 0;
+  overflow-y: auto;
+  border: 1px solid var(--boardstat-border);
+  list-style: none;
+}
+
+.address-suggestions:empty {
+  display: none;
+}
+
+.address-suggestions button {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 0;
+  border-bottom: 1px solid var(--boardstat-border);
+  color: var(--boardstat-navy);
+  background: #fff;
+  text-align: left;
+}
+
+.address-suggestions button:hover,
+.address-suggestions button:focus-visible {
+  background: #edf2ff;
+}
+
+.selected-address-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.selected-address-heading h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.35rem 0.45rem 0.35rem 0.65rem;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--boardstat-blue);
+  font-size: 0.84rem;
+}
+
+.filter-chip button {
+  width: 1.45rem;
+  height: 1.45rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--boardstat-navy);
+  background: #fff;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
 .table-scroll {
   margin-top: 1rem;
   overflow-x: auto;
@@ -342,7 +639,7 @@ select:focus-visible,
 
 table {
   width: 100%;
-  min-width: 900px;
+  min-width: 1180px;
   border-collapse: collapse;
 }
 
@@ -402,7 +699,13 @@ tbody tr:hover {
     max-width: none;
   }
 
-  .filter-grid {
+  .view-nav,
+  .filter-option-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .filter-grid,
+  .date-filter-grid {
     grid-template-columns: 1fr;
   }
 
@@ -426,6 +729,19 @@ tbody tr:hover {
   }
 
   .top-header-content > p span {
+    display: none;
+  }
+
+  .view-nav,
+  .filter-option-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .filter-card > summary {
+    align-items: flex-start;
+  }
+
+  .filter-count {
     display: none;
   }
 

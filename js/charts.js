@@ -11,7 +11,7 @@ const monthFormatter = new Intl.DateTimeFormat("en-US", {
   year: "numeric",
   timeZone: "UTC",
 });
-
+const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 const palette = ["#3b6cf6", "#a513b6", "#0c8763", "#c45500", "#008299", "#8762cd", "#ea172b", "#21883f", "#6379b7", "#777677"];
 
 function requireChartJs() {
@@ -39,6 +39,11 @@ function parseSocrataPeriod(value) {
   return new Date(`${String(value).slice(0, 10)}T00:00:00Z`);
 }
 
+function formatPeriod(value, granularity) {
+  const formatter = granularity === "day" ? shortDateFormatter : monthFormatter;
+  return formatter.format(parseSocrataPeriod(value));
+}
+
 function summarizeTop(rows, noun) {
   if (!rows.length) return `No ${noun} were reported for this selection.`;
   return rows
@@ -47,29 +52,50 @@ function summarizeTop(rows, noun) {
     .join("; ");
 }
 
-export function renderComplaintChart(rows) {
-  if (!rows.length) {
-    destroyChart("complaints-chart");
-    writeSummary("complaints-summary", "No complaint types were reported for this selection.");
+function renderRankedBar({ canvasId, summaryId, rows, noun, color = palette[0], limit = 10, horizontal = true }) {
+  const displayed = rows.slice(0, limit);
+  if (!displayed.length) {
+    destroyChart(canvasId);
+    writeSummary(summaryId, `No ${noun} were reported for this selection.`);
     return;
   }
 
-  replaceChart("complaints-chart", {
+  replaceChart(canvasId, {
     type: "bar",
     data: {
-      labels: rows.map((row) => row.label),
-      datasets: [{ label: "Requests", data: rows.map((row) => row.count), backgroundColor: palette[0] }],
+      labels: displayed.map((row) => row.label),
+      datasets: [{ label: "Requests", data: displayed.map((row) => row.count), backgroundColor: color }],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      indexAxis: "y",
+      indexAxis: horizontal ? "y" : "x",
       animation: { duration: 250 },
       plugins: { legend: { display: false } },
-      scales: { x: { beginAtZero: true, ticks: { precision: 0 } } },
+      scales: { [horizontal ? "x" : "y"]: { beginAtZero: true, ticks: { precision: 0 } } },
     },
   });
-  writeSummary("complaints-summary", `Leading complaint types — ${summarizeTop(rows, "complaints")}.`);
+  writeSummary(summaryId, `Leading ${noun} — ${summarizeTop(displayed, noun)}.`);
+}
+
+export function renderComplaintChart(rows) {
+  renderRankedBar({ canvasId: "complaints-chart", summaryId: "complaints-summary", rows, noun: "complaint types" });
+}
+
+export function renderDescriptorChart(rows) {
+  renderRankedBar({ canvasId: "descriptors-chart", summaryId: "descriptors-summary", rows, noun: "descriptors", color: palette[1] });
+}
+
+export function renderBoardChart(rows) {
+  renderRankedBar({
+    canvasId: "boards-chart",
+    summaryId: "boards-summary",
+    rows,
+    noun: "Community Boards",
+    color: palette[4],
+    limit: 15,
+    horizontal: false,
+  });
 }
 
 export function renderTimelineChart(result) {
@@ -79,12 +105,10 @@ export function renderTimelineChart(result) {
     return;
   }
 
-  const formatter = result.granularity === "day" ? shortDateFormatter : monthFormatter;
-  const labels = result.rows.map((row) => formatter.format(parseSocrataPeriod(row.period)));
   replaceChart("timeline-chart", {
     type: "line",
     data: {
-      labels,
+      labels: result.rows.map((row) => formatPeriod(row.period, result.granularity)),
       datasets: [{
         label: "Requests",
         data: result.rows.map((row) => row.count),
@@ -114,7 +138,8 @@ export function renderTimelineChart(result) {
 }
 
 export function renderAgencyChart(rows) {
-  if (!rows.length) {
+  const displayed = rows.slice(0, 10);
+  if (!displayed.length) {
     destroyChart("agencies-chart");
     writeSummary("agencies-summary", "No agencies were reported for this selection.");
     return;
@@ -123,8 +148,8 @@ export function renderAgencyChart(rows) {
   replaceChart("agencies-chart", {
     type: "doughnut",
     data: {
-      labels: rows.map((row) => row.label),
-      datasets: [{ data: rows.map((row) => row.count), backgroundColor: palette, borderColor: "#ffffff", borderWidth: 2 }],
+      labels: displayed.map((row) => row.label),
+      datasets: [{ data: displayed.map((row) => row.count), backgroundColor: palette, borderColor: "#ffffff", borderWidth: 2 }],
     },
     options: {
       responsive: true,
@@ -133,5 +158,115 @@ export function renderAgencyChart(rows) {
       plugins: { legend: { position: "bottom", labels: { boxWidth: 12, padding: 14 } } },
     },
   });
-  writeSummary("agencies-summary", `Leading agencies — ${summarizeTop(rows, "agencies")}.`);
+  writeSummary("agencies-summary", `Leading agencies — ${summarizeTop(displayed, "agencies")}.`);
+}
+
+export function renderStatusChart(rows) {
+  if (!rows.length) {
+    destroyChart("statuses-chart");
+    writeSummary("statuses-summary", "No statuses were reported for this selection.");
+    return;
+  }
+
+  replaceChart("statuses-chart", {
+    type: "bar",
+    data: {
+      labels: rows.map((row) => row.label),
+      datasets: [{ label: "Requests", data: rows.map((row) => row.count), backgroundColor: palette[2] }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 250 },
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+    },
+  });
+  writeSummary("statuses-summary", `Status totals — ${summarizeTop(rows, "statuses")}.`);
+}
+
+export function renderComplaintComparisonChart(result) {
+  if (!result.rows.length || !result.complaintTypes.length) {
+    destroyChart("comparison-chart");
+    writeSummary("comparison-summary", "No complaint comparison is available for this selection.");
+    return;
+  }
+
+  const periods = [...new Set(result.rows.map((row) => row.period))].sort();
+  const datasets = result.complaintTypes.map((complaintType, index) => {
+    const counts = new Map(
+      result.rows
+        .filter((row) => row.complaintType === complaintType)
+        .map((row) => [row.period, row.count]),
+    );
+    return {
+      label: complaintType,
+      data: periods.map((period) => counts.get(period) || 0),
+      borderColor: palette[index % palette.length],
+      backgroundColor: palette[index % palette.length],
+      borderWidth: 2,
+      pointRadius: periods.length > 45 ? 0 : 2,
+      tension: 0.18,
+    };
+  });
+
+  replaceChart("comparison-chart", {
+    type: "line",
+    data: { labels: periods.map((period) => formatPeriod(period, result.granularity)), datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 250 },
+      plugins: { legend: { position: "bottom" } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+    },
+  });
+  writeSummary("comparison-summary", `Comparing ${result.complaintTypes.join(", ")} over time.`);
+}
+
+export function renderAnnualChart(rows) {
+  if (!rows.length) {
+    destroyChart("annual-chart");
+    writeSummary("annual-summary", "No annual totals were reported for this selection.");
+    return;
+  }
+  replaceChart("annual-chart", {
+    type: "bar",
+    data: {
+      labels: rows.map((row) => String(row.year)),
+      datasets: [{ label: "Requests", data: rows.map((row) => row.count), backgroundColor: palette[0] }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 250 },
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+    },
+  });
+  writeSummary("annual-summary", `${rows.length} annual total${rows.length === 1 ? "" : "s"} shown.`);
+}
+
+export function renderMonthlyChart(rows) {
+  if (!rows.length) {
+    destroyChart("monthly-chart");
+    writeSummary("monthly-summary", "No monthly totals were reported for this selection.");
+    return;
+  }
+  const counts = new Map(rows.map((row) => [row.month, row.count]));
+  replaceChart("monthly-chart", {
+    type: "bar",
+    data: {
+      labels: monthNames,
+      datasets: [{ label: "Requests", data: monthNames.map((_, index) => counts.get(index + 1) || 0), backgroundColor: palette[1] }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 250 },
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+    },
+  });
+  writeSummary("monthly-summary", "Totals are grouped by calendar month across the selected years and date range.");
 }
