@@ -37,6 +37,8 @@ function createPopup(point) {
   const popup = document.createElement("div");
   addTextLine(popup, point.complaint_type || "311 service request", "map-popup-title");
   addTextLine(popup, point.descriptor);
+  addTextLine(popup, [point.agency, point.status].filter(Boolean).join(" · "));
+  addTextLine(popup, point.community_board);
   addTextLine(popup, point.incident_address);
   if (point.created_date) {
     addTextLine(popup, formatSocrataDateTime(point.created_date));
