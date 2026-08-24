@@ -1,21 +1,16 @@
-export const DATASETS = Object.freeze({
-  current: "erm2-nwe9",
-  historical: "76ig-c548",
-});
+import { getBoroughConfig } from "./boroughs.js";
 
-export const MANHATTAN_BOARDS = Object.freeze([
-  ...Array.from({ length: 12 }, (_, index) => `${String(index + 1).padStart(2, "0")} MANHATTAN`),
-  "64 MANHATTAN",
-  "Unspecified MANHATTAN",
-  "08 BRONX",
-]);
+export const DATASETS = Object.freeze({
+  current: Object.freeze({ id: "erm2-nwe9", label: "2020–present", start: "2020-01-01", end: null }),
+  historical: Object.freeze({ id: "76ig-c548", label: "2010–2019", start: "2010-01-01", end: "2019-12-31" }),
+});
 
 export const MAP_POINT_LIMIT = 250;
 export const RECENT_REQUEST_LIMIT = 100;
-export const FILTER_OPTION_LIMIT = 500;
+export const FILTER_OPTION_LIMIT = 5000;
 
 const API_ROOT = "https://data.cityofnewyork.us/resource";
-const ROUTE_BOROUGH = "MANHATTAN";
+const EARLIEST_DATE = DATASETS.historical.start;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/;
 const responseCache = new Map();
@@ -72,11 +67,13 @@ function validateStringValues(values, name, maximum = 25) {
 }
 
 export function validateFilters(filters) {
+  const route = getBoroughConfig(filters.borough);
+  if (!route) throw new TypeError("Choose a supported borough route.");
   if (!Array.isArray(filters.boards) || filters.boards.length === 0) {
     throw new TypeError("Choose at least one Community Board.");
   }
-  if (filters.boards.some((board) => !MANHATTAN_BOARDS.includes(board))) {
-    throw new TypeError("Choose only permitted Manhattan Community Board values.");
+  if (filters.boards.some((board) => !route.boards.includes(board))) {
+    throw new TypeError(`Choose only permitted ${route.name} Community Board values.`);
   }
 
   validateStringValues(filters.complaints || [], "complaint types");
@@ -86,18 +83,18 @@ export function validateFilters(filters) {
   validateStringValues(filters.addresses || [], "addresses", 10);
 
   const currentYear = new Date().getFullYear();
-  if (!Array.isArray(filters.years || []) || (filters.years || []).length > currentYear - 2019) {
+  if (!Array.isArray(filters.years || []) || (filters.years || []).length > currentYear - 2009) {
     throw new TypeError("Choose valid years.");
   }
-  if ((filters.years || []).some((year) => !Number.isInteger(year) || year < 2020 || year > currentYear)) {
-    throw new TypeError("Choose years from 2020 onward.");
+  if ((filters.years || []).some((year) => !Number.isInteger(year) || year < 2010 || year > currentYear)) {
+    throw new TypeError("Choose years from 2010 onward.");
   }
 
   if (!isRealDate(filters.startDate) || !isRealDate(filters.endDate)) {
     throw new TypeError("Choose valid start and end dates.");
   }
-  if (filters.startDate < "2020-01-01") {
-    throw new TypeError("This milestone supports dates from January 1, 2020 onward.");
+  if (filters.startDate < EARLIEST_DATE) {
+    throw new TypeError("BoardStat data begins on January 1, 2010.");
   }
   if (filters.startDate > filters.endDate) {
     throw new TypeError("Start date must be on or before end date.");
@@ -109,15 +106,33 @@ function buildStringInClause(field, values) {
   return `${field} IN (${literals})`;
 }
 
-function buildWhere(filters, extraClauses = [], { omit = [] } = {}) {
+function getDatasetSlices(filters) {
   validateFilters(filters);
+  const slices = [];
+  [DATASETS.historical, DATASETS.current].forEach((dataset) => {
+    const startDate = filters.startDate > dataset.start ? filters.startDate : dataset.start;
+    const datasetEnd = dataset.end || filters.endDate;
+    const endDate = filters.endDate < datasetEnd ? filters.endDate : datasetEnd;
+    if (startDate > endDate) return;
+    if (filters.years.length) {
+      const hasSelectedYear = filters.years.some((year) => (
+        year >= Number(startDate.slice(0, 4)) && year <= Number(endDate.slice(0, 4))
+      ));
+      if (!hasSelectedYear) return;
+    }
+    slices.push({ dataset, startDate, endDate });
+  });
+  return slices;
+}
+
+function buildWhere(filters, slice, extraClauses = [], { omit = [] } = {}) {
+  const route = getBoroughConfig(filters.borough);
   const omitted = new Set(omit);
-  const endExclusive = addUtcDays(filters.endDate, 1);
   const clauses = [
-    `borough = '${ROUTE_BOROUGH}'`,
+    `borough = '${escapeSoqlLiteral(route.datasetValue)}'`,
     buildStringInClause(DIMENSIONS.boards, filters.boards),
-    `created_date >= '${filters.startDate}T00:00:00.000'`,
-    `created_date < '${endExclusive}T00:00:00.000'`,
+    `created_date >= '${slice.startDate}T00:00:00.000'`,
+    `created_date < '${addUtcDays(slice.endDate, 1)}T00:00:00.000'`,
   ];
 
   Object.entries(DIMENSIONS).forEach(([filterName, field]) => {
@@ -125,23 +140,22 @@ function buildWhere(filters, extraClauses = [], { omit = [] } = {}) {
     const values = filters[filterName] || [];
     if (values.length) clauses.push(buildStringInClause(field, values));
   });
-
-  if (!omitted.has("years") && (filters.years || []).length) {
+  if (!omitted.has("years") && filters.years.length) {
     clauses.push(`date_extract_y(created_date) IN (${filters.years.join(", ")})`);
   }
   return [...clauses, ...extraClauses].join(" AND ");
 }
 
-function buildUrl(parameters, dataset = DATASETS.current) {
+function buildUrl(parameters, datasetId) {
   const search = new URLSearchParams();
   Object.entries(parameters).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== "") search.set(`$${key}`, String(value));
   });
-  return `${API_ROOT}/${dataset}.json?${search.toString()}`;
+  return `${API_ROOT}/${datasetId}.json?${search.toString()}`;
 }
 
-async function query(parameters, { signal, dataset = DATASETS.current } = {}) {
-  const url = buildUrl(parameters, dataset);
+async function query(parameters, { signal, datasetId = DATASETS.current.id } = {}) {
+  const url = buildUrl(parameters, datasetId);
   if (responseCache.has(url)) return responseCache.get(url);
 
   let response;
@@ -168,64 +182,80 @@ async function query(parameters, { signal, dataset = DATASETS.current } = {}) {
   return rows;
 }
 
-function normalizeCounts(rows, labelField) {
-  return rows.map((row) => ({ label: row[labelField] || "Unknown", count: Number(row.count) || 0 }));
+async function querySlices(filters, parameterFactory, options = {}) {
+  const slices = getDatasetSlices(filters);
+  return Promise.all(slices.map(async (slice) => ({
+    slice,
+    rows: await query(parameterFactory(slice), { ...options, datasetId: slice.dataset.id }),
+  })));
 }
 
-async function getDimensionBreakdown(filters, filterName, options, limit) {
+function mergeCounts(resultSets, getKey, makeRow) {
+  const totals = new Map();
+  resultSets.flatMap((result) => result.rows).forEach((row) => {
+    const key = getKey(row);
+    totals.set(key, (totals.get(key) || 0) + (Number(row.count) || 0));
+  });
+  return [...totals.entries()].map(([key, count]) => makeRow(key, count));
+}
+
+function mergeDimensionCounts(resultSets, field) {
+  return mergeCounts(resultSets, (row) => row[field] || "Unknown", (label, count) => ({ label, count }))
+    .sort((first, second) => second.count - first.count || first.label.localeCompare(second.label));
+}
+
+async function getDimensionBreakdown(filters, filterName, options) {
   const field = DIMENSIONS[filterName];
-  const rows = await query(
-    {
-      select: `${field}, count(*) AS count`,
-      where: buildWhere(filters, [`${field} IS NOT NULL`]),
-      group: field,
-      order: "count DESC",
-      limit,
-    },
-    options,
-  );
-  return normalizeCounts(rows, field);
+  const results = await querySlices(filters, (slice) => ({
+    select: `${field}, count(*) AS count`,
+    where: buildWhere(filters, slice, [`${field} IS NOT NULL`]),
+    group: field,
+    order: "count DESC",
+    limit: FILTER_OPTION_LIMIT,
+  }), options);
+  return mergeDimensionCounts(results, field);
 }
 
 export async function getTotalRequests(filters, options) {
-  const rows = await query({ select: "count(*) AS count", where: buildWhere(filters) }, options);
-  return Number(rows[0]?.count) || 0;
+  const results = await querySlices(filters, (slice) => ({
+    select: "count(*) AS count",
+    where: buildWhere(filters, slice),
+  }), options);
+  return results.reduce((total, result) => total + (Number(result.rows[0]?.count) || 0), 0);
 }
 
 export function getTopComplaintTypes(filters, options) {
-  return getDimensionBreakdown(filters, "complaints", options, FILTER_OPTION_LIMIT);
+  return getDimensionBreakdown(filters, "complaints", options);
 }
 
 export function getDescriptorBreakdown(filters, options) {
-  return getDimensionBreakdown(filters, "descriptors", options, FILTER_OPTION_LIMIT);
+  return getDimensionBreakdown(filters, "descriptors", options);
 }
 
 export function getAgencyBreakdown(filters, options) {
-  return getDimensionBreakdown(filters, "agencies", options, FILTER_OPTION_LIMIT);
+  return getDimensionBreakdown(filters, "agencies", options);
 }
 
 export function getStatusBreakdown(filters, options) {
-  return getDimensionBreakdown(filters, "statuses", options, FILTER_OPTION_LIMIT);
+  return getDimensionBreakdown(filters, "statuses", options);
 }
 
 export function getBoardBreakdown(filters, options) {
-  return getDimensionBreakdown(filters, "boards", options, MANHATTAN_BOARDS.length);
+  return getDimensionBreakdown(filters, "boards", options);
 }
 
 export async function getTimeline(filters, options) {
-  validateFilters(filters);
   const granularity = daysInRange(filters.startDate, filters.endDate) <= 90 ? "day" : "month";
   const bucket = granularity === "day" ? "date_trunc_ymd(created_date)" : "date_trunc_ym(created_date)";
-  const rows = await query(
-    {
-      select: `${bucket} AS period, count(*) AS count`,
-      where: buildWhere(filters),
-      group: "period",
-      order: "period ASC",
-    },
-    options,
-  );
-  return { granularity, rows: rows.map((row) => ({ period: row.period, count: Number(row.count) || 0 })) };
+  const results = await querySlices(filters, (slice) => ({
+    select: `${bucket} AS period, count(*) AS count`,
+    where: buildWhere(filters, slice),
+    group: "period",
+    order: "period ASC",
+  }), options);
+  const rows = mergeCounts(results, (row) => row.period, (period, count) => ({ period, count }))
+    .sort((first, second) => first.period.localeCompare(second.period));
+  return { granularity, rows };
 }
 
 export async function getComplaintTimeline(filters, complaintTypes, options) {
@@ -233,103 +263,111 @@ export async function getComplaintTimeline(filters, complaintTypes, options) {
   validateFilters(comparisonFilters);
   const granularity = daysInRange(filters.startDate, filters.endDate) <= 90 ? "day" : "month";
   const bucket = granularity === "day" ? "date_trunc_ymd(created_date)" : "date_trunc_ym(created_date)";
-  const rows = await query(
-    {
-      select: `${bucket} AS period, complaint_type, count(*) AS count`,
-      where: buildWhere(comparisonFilters, ["complaint_type IS NOT NULL"]),
-      group: "period, complaint_type",
-      order: "period ASC, complaint_type ASC",
+  const results = await querySlices(comparisonFilters, (slice) => ({
+    select: `${bucket} AS period, complaint_type, count(*) AS count`,
+    where: buildWhere(comparisonFilters, slice, ["complaint_type IS NOT NULL"]),
+    group: "period, complaint_type",
+    order: "period ASC, complaint_type ASC",
+  }), options);
+  const rows = mergeCounts(
+    results,
+    (row) => `${row.period}\u0000${row.complaint_type}`,
+    (key, count) => {
+      const [period, complaintType] = key.split("\u0000");
+      return { period, complaintType, count };
     },
-    options,
-  );
-  return {
-    granularity,
-    complaintTypes,
-    rows: rows.map((row) => ({ period: row.period, complaintType: row.complaint_type, count: Number(row.count) || 0 })),
-  };
+  ).sort((first, second) => first.period.localeCompare(second.period) || first.complaintType.localeCompare(second.complaintType));
+  return { granularity, complaintTypes, rows };
 }
 
 export async function getAverageDaysToClose(filters, options) {
-  const rows = await query(
-    {
-      select: "avg(date_diff_d(closed_date, created_date)) AS average_days",
-      where: buildWhere(filters, ["closed_date IS NOT NULL", "closed_date >= created_date"]),
-    },
-    options,
-  );
-  const value = Number(rows[0]?.average_days);
-  return Number.isFinite(value) ? value : null;
+  const results = await querySlices(filters, (slice) => ({
+    select: "avg(date_diff_d(closed_date, created_date)) AS average_days, count(*) AS closed_count",
+    where: buildWhere(filters, slice, ["closed_date IS NOT NULL", "closed_date >= created_date"]),
+  }), options);
+  let totalDays = 0;
+  let totalClosed = 0;
+  results.forEach(({ rows }) => {
+    const average = Number(rows[0]?.average_days);
+    const count = Number(rows[0]?.closed_count) || 0;
+    if (Number.isFinite(average) && count) {
+      totalDays += average * count;
+      totalClosed += count;
+    }
+  });
+  return totalClosed ? totalDays / totalClosed : null;
 }
 
 export async function getAnnualBreakdown(filters, options) {
-  const rows = await query(
-    {
-      select: "date_extract_y(created_date) AS year, count(*) AS count",
-      where: buildWhere(filters),
-      group: "year",
-      order: "year ASC",
-    },
-    options,
-  );
-  return rows.map((row) => ({ year: Number(row.year), count: Number(row.count) || 0 }));
+  const results = await querySlices(filters, (slice) => ({
+    select: "date_extract_y(created_date) AS year, count(*) AS count",
+    where: buildWhere(filters, slice),
+    group: "year",
+    order: "year ASC",
+  }), options);
+  return mergeCounts(results, (row) => String(row.year), (year, count) => ({ year: Number(year), count }))
+    .sort((first, second) => first.year - second.year);
 }
 
 export async function getMonthlyBreakdown(filters, options) {
-  const rows = await query(
-    {
-      select: "date_extract_m(created_date) AS month, count(*) AS count",
-      where: buildWhere(filters),
-      group: "month",
-      order: "month ASC",
-    },
-    options,
-  );
-  return rows.map((row) => ({ month: Number(row.month), count: Number(row.count) || 0 }));
+  const results = await querySlices(filters, (slice) => ({
+    select: "date_extract_m(created_date) AS month, count(*) AS count",
+    where: buildWhere(filters, slice),
+    group: "month",
+    order: "month ASC",
+  }), options);
+  return mergeCounts(results, (row) => String(row.month), (month, count) => ({ month: Number(month), count }))
+    .sort((first, second) => first.month - second.month);
+}
+
+function newestFirst(first, second) {
+  return String(second.created_date || "").localeCompare(String(first.created_date || ""));
 }
 
 export async function getMapPoints(filters, options) {
-  return query(
-    {
-      select: "latitude,longitude,complaint_type,descriptor,agency,status,community_board,created_date,unique_key,incident_address",
-      where: buildWhere(filters, ["latitude IS NOT NULL", "longitude IS NOT NULL"]),
-      order: "created_date DESC",
-      limit: MAP_POINT_LIMIT,
-    },
-    options,
-  );
+  const results = await querySlices(filters, (slice) => ({
+    select: "latitude,longitude,complaint_type,descriptor,agency,status,community_board,created_date,unique_key,incident_address",
+    where: buildWhere(filters, slice, ["latitude IS NOT NULL", "longitude IS NOT NULL"]),
+    order: "created_date DESC",
+    limit: MAP_POINT_LIMIT,
+  }), options);
+  return results.flatMap(({ slice, rows }) => rows.map((row) => ({
+    ...row,
+    dataset: slice.dataset.id,
+    datasetLabel: slice.dataset.label,
+  }))).sort(newestFirst);
 }
 
 export async function getRecentRequests(filters, options) {
-  return query(
-    {
-      select: "created_date,closed_date,complaint_type,descriptor,agency,incident_address,status,community_board,unique_key",
-      where: buildWhere(filters),
-      order: "created_date DESC",
-      limit: RECENT_REQUEST_LIMIT,
-    },
-    options,
-  );
+  const results = await querySlices(filters, (slice) => ({
+    select: "created_date,closed_date,complaint_type,descriptor,agency,incident_address,status,community_board,unique_key",
+    where: buildWhere(filters, slice),
+    order: "created_date DESC",
+    limit: RECENT_REQUEST_LIMIT,
+  }), options);
+  return results.flatMap(({ slice, rows }) => rows.map((row) => ({
+    ...row,
+    dataset: slice.dataset.id,
+    datasetLabel: slice.dataset.label,
+  })))
+    .sort(newestFirst)
+    .slice(0, RECENT_REQUEST_LIMIT);
 }
 
 export async function getFilterOptions(filters, options) {
   const names = ["complaints", "descriptors", "agencies", "statuses"];
-  const results = await Promise.all(
-    names.map(async (filterName) => {
-      const field = DIMENSIONS[filterName];
-      const rows = await query(
-        {
-          select: `${field}, count(*) AS count`,
-          where: buildWhere(filters, [`${field} IS NOT NULL`], { omit: [filterName] }),
-          group: field,
-          order: "count DESC",
-          limit: FILTER_OPTION_LIMIT,
-        },
-        options,
-      );
-      return [filterName, normalizeCounts(rows, field)];
-    }),
-  );
-  return Object.fromEntries(results);
+  const entries = await Promise.all(names.map(async (filterName) => {
+    const field = DIMENSIONS[filterName];
+    const results = await querySlices(filters, (slice) => ({
+      select: `${field}, count(*) AS count`,
+      where: buildWhere(filters, slice, [`${field} IS NOT NULL`], { omit: [filterName] }),
+      group: field,
+      order: "count DESC",
+      limit: FILTER_OPTION_LIMIT,
+    }), options);
+    return [filterName, mergeDimensionCounts(results, field)];
+  }));
+  return Object.fromEntries(entries);
 }
 
 export async function searchAddresses(filters, rawTerm, options) {
@@ -340,21 +378,28 @@ export async function searchAddresses(filters, rawTerm, options) {
     .slice(0, 60);
   if (term.length < 2) return [];
 
-  const rows = await query(
-    {
-      select: "incident_address, count(*) AS count",
-      where: buildWhere(
-        filters,
-        ["incident_address IS NOT NULL", `upper(incident_address) LIKE '%${escapeSoqlLiteral(term.toUpperCase())}%'`],
-        { omit: ["addresses"] },
-      ),
-      group: "incident_address",
-      order: "count DESC",
-      limit: 20,
-    },
-    options,
-  );
-  return normalizeCounts(rows, "incident_address");
+  const results = await querySlices(filters, (slice) => ({
+    select: "incident_address, count(*) AS count",
+    where: buildWhere(
+      filters,
+      slice,
+      ["incident_address IS NOT NULL", `upper(incident_address) LIKE '%${escapeSoqlLiteral(term.toUpperCase())}%'`],
+      { omit: ["addresses"] },
+    ),
+    group: "incident_address",
+    order: "count DESC",
+    limit: 100,
+  }), options);
+  return mergeDimensionCounts(results, "incident_address").slice(0, 20);
+}
+
+export function getDatasetSummary(filters) {
+  const slices = getDatasetSlices(filters);
+  return {
+    count: slices.length,
+    labels: slices.map((slice) => slice.dataset.label),
+    ids: slices.map((slice) => slice.dataset.id),
+  };
 }
 
 export function clearApiCache() {
