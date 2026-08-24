@@ -456,6 +456,31 @@ select:focus-visible,
   font-size: 0.9rem;
 }
 
+.dashboard-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.dashboard-toolbar {
+  margin: -0.75rem 0 1.5rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--boardstat-border);
+  border-radius: 3px;
+  background: #fff;
+}
+
+.dashboard-status-row .dashboard-status {
+  flex: 1 1 auto;
+}
+
+.retry-button {
+  flex: 0 0 auto;
+  min-height: 44px;
+  padding-inline: 0.6rem;
+}
+
 .active-range {
   margin-top: 0.2rem;
 }
@@ -492,6 +517,22 @@ select:focus-visible,
   content: "";
   pointer-events: none;
   background: rgba(255, 255, 255, 0.62);
+}
+
+.dashboard-card[data-stale="true"]::before {
+  position: absolute;
+  top: 0.65rem;
+  right: 0.65rem;
+  z-index: 2;
+  padding: 0.25rem 0.45rem;
+  content: "Stale result";
+  border-radius: 2px;
+  color: #fff;
+  background: var(--boardstat-error);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .chart-card-wide {
@@ -777,6 +818,11 @@ tbody tr:hover {
   .view-nav,
   .filter-option-grid {
     grid-template-columns: 1fr;
+  }
+
+  .dashboard-status-row {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .filter-card > summary {

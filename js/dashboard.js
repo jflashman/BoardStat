@@ -78,6 +78,7 @@ const elements = {
   filterOptionsStatus: document.getElementById("filter-options-status"),
   filterCount: document.getElementById("filter-count"),
   status: document.getElementById("dashboard-status"),
+  retry: document.getElementById("retry-dashboard"),
   activeRange: document.getElementById("active-range"),
   activeFilterList: document.getElementById("active-filter-list"),
   total: document.getElementById("total-requests"),
@@ -367,12 +368,17 @@ function setPanelLoading(panelId) {
   const panel = getPanel(panelId);
   panel.classList.remove("is-error");
   panel.setAttribute("aria-busy", "true");
-  panel.querySelector(".panel-state").textContent = "Loading live data…";
+  const hadContent = panel.dataset.hasContent === "true";
+  if (hadContent) panel.dataset.stale = "true";
+  panel.querySelector(".panel-state").textContent = hadContent
+    ? "Loading live data… Previous result remains visible."
+    : "Loading live data…";
 }
 
 function setPanelReady(panelId, message = "") {
   const panel = getPanel(panelId);
   panel.classList.remove("is-error");
+  delete panel.dataset.stale;
   panel.setAttribute("aria-busy", "false");
   panel.querySelector(".panel-state").textContent = message;
 }
@@ -382,6 +388,8 @@ function setPanelError(panelId, error) {
   panel.classList.add("is-error");
   panel.setAttribute("aria-busy", "false");
   const hadContent = panel.dataset.hasContent === "true";
+  if (hadContent) panel.dataset.stale = "true";
+  else delete panel.dataset.stale;
   panel.querySelector(".panel-state").textContent = hadContent
     ? `Could not refresh this panel. Showing the last successful result. ${error.message}`
     : `Could not load this panel. ${error.message}`;
@@ -527,6 +535,7 @@ async function refreshCurrentView() {
   if (validationMessage) {
     showValidation(validationMessage);
     elements.status.textContent = "Dashboard was not refreshed.";
+    elements.retry.disabled = false;
     return;
   }
 
@@ -536,10 +545,12 @@ async function refreshCurrentView() {
   activeViewController = controller;
   const filters = toApiFilters();
   const options = { signal: controller.signal };
+  elements.retry.disabled = true;
 
   if (state.view === "filters") {
     renderStateSummary();
     elements.status.textContent = "Shared filters are ready.";
+    elements.retry.disabled = false;
     return;
   }
 
@@ -550,6 +561,7 @@ async function refreshCurrentView() {
   elements.status.textContent = failures
     ? `View refreshed with ${failures} panel${failures === 1 ? "" : "s"} unavailable.`
     : "View updated with live NYC Open Data across every applicable dataset.";
+  elements.retry.disabled = false;
 }
 
 async function refreshFilterOptions() {
@@ -588,9 +600,12 @@ function handleFilterStateChange() {
   const message = getValidationMessage();
   showValidation(message);
   if (message) {
+    window.clearTimeout(refreshTimer);
+    activeViewController?.abort();
     filterOptionsController?.abort();
     elements.filterOptionsStatus.textContent = "Filter options are unchanged until the selection is valid.";
     elements.status.textContent = "Dashboard was not refreshed.";
+    elements.retry.disabled = false;
     return;
   }
   writeUrl();
@@ -598,7 +613,7 @@ function handleFilterStateChange() {
   scheduleOptionRefresh();
 }
 
-function setActiveView(view, { push = false, focus = false } = {}) {
+function setActiveView(view, { push = false, focusTab = false } = {}) {
   if (!VIEWS.includes(view)) return;
   state.view = view;
   document.querySelectorAll("[data-view]").forEach((button) => {
@@ -612,7 +627,7 @@ function setActiveView(view, { push = false, focus = false } = {}) {
   if (view === "filters") elements.sharedFilterPanel.open = true;
   writeUrl({ push });
   refreshCurrentView();
-  if (focus) document.getElementById(`view-${view}`).focus({ preventScroll: true });
+  if (focusTab) document.querySelector(`[data-view="${view}"]`).focus({ preventScroll: true });
 }
 
 function renderAddressSuggestions(rows) {
@@ -712,6 +727,11 @@ elements.reset.addEventListener("click", () => {
   if (elements.sharedFilterPanel.open) refreshFilterOptions();
 });
 
+elements.retry.addEventListener("click", () => {
+  window.clearTimeout(refreshTimer);
+  refreshCurrentView();
+});
+
 elements.clearAddresses.addEventListener("click", () => {
   state.addresses = [];
   handleFilterStateChange();
@@ -727,7 +747,7 @@ elements.sharedFilterPanel.addEventListener("toggle", () => {
 });
 
 document.querySelectorAll("[data-view]").forEach((button) => {
-  button.addEventListener("click", () => setActiveView(button.dataset.view, { push: true, focus: true }));
+  button.addEventListener("click", () => setActiveView(button.dataset.view, { push: true }));
   button.addEventListener("keydown", (event) => {
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
     event.preventDefault();
@@ -737,7 +757,7 @@ document.querySelectorAll("[data-view]").forEach((button) => {
       : event.key === "End"
         ? VIEWS.length - 1
         : (currentIndex + (event.key === "ArrowRight" ? 1 : -1) + VIEWS.length) % VIEWS.length;
-    document.querySelector(`[data-view="${VIEWS[targetIndex]}"]`).focus();
+    setActiveView(VIEWS[targetIndex], { push: true, focusTab: true });
   });
 });
 

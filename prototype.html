@@ -50,7 +50,7 @@
     <main id="dashboard" class="prototype-container dashboard-shell">
       <section class="hero" aria-labelledby="page-title">
         <div>
-          <p class="eyebrow">Milestone 3 prototype</p>
+          <p class="eyebrow">Milestone 4 hardening prototype</p>
           <h1 id="page-title">Manhattan 311 dashboard</h1>
           <p class="hero-copy">Explore service requests from 2010 to the present across synchronized BoardStat views using live NYC Open Data.</p>
         </div>
@@ -75,7 +75,7 @@
         <strong>Experimental:</strong> browser-native BoardStat prototype using live NYC Open Data. Existing BoardStat production pages are unchanged.
       </aside>
 
-      <nav class="view-nav" aria-label="Dashboard views" role="tablist">
+      <nav class="view-nav" aria-label="Dashboard views" aria-orientation="horizontal" role="tablist">
         <button id="tab-filters" type="button" role="tab" aria-selected="false" aria-controls="view-filters" data-view="filters">1. Set Filters</button>
         <button id="tab-overview" type="button" role="tab" aria-selected="true" aria-controls="view-overview" data-view="overview">2. Board Overview</button>
         <button id="tab-address" type="button" role="tab" aria-selected="false" aria-controls="view-address" data-view="address">3. Address Lookup</button>
@@ -156,10 +156,16 @@
           </form>
           <p id="filter-options-status" class="filter-options-status" role="status" aria-live="polite"></p>
           <p id="filter-error" class="form-error" role="alert" hidden></p>
-          <p id="dashboard-status" class="dashboard-status" role="status" aria-live="polite"></p>
-          <p id="active-range" class="active-range"></p>
         </div>
       </details>
+
+      <div class="dashboard-toolbar" aria-label="Dashboard refresh status">
+        <div class="dashboard-status-row">
+          <p id="dashboard-status" class="dashboard-status" role="status" aria-live="polite"></p>
+          <button id="retry-dashboard" class="text-button retry-button" type="button" aria-describedby="dashboard-status">Retry current view</button>
+        </div>
+        <p id="active-range" class="active-range"></p>
+      </div>
 
       <section id="view-filters" class="view-panel" role="tabpanel" aria-labelledby="tab-filters" tabindex="0" hidden>
         <article class="dashboard-card guidance-card">
@@ -181,19 +187,19 @@
 
         <article id="boards-panel" class="dashboard-card chart-card" aria-labelledby="boards-heading">
           <div class="card-heading"><div><p class="eyebrow">Selected districts</p><h2 id="boards-heading">Requests by Community Board</h2></div></div>
-          <div class="chart-wrap"><canvas id="boards-chart" role="img" aria-label="Requests by Community Board chart"></canvas></div>
+          <div class="chart-wrap"><canvas id="boards-chart" role="img" aria-label="Requests by Community Board chart" aria-describedby="boards-summary"></canvas></div>
           <p id="boards-summary" class="chart-summary"></p><p class="panel-state" aria-live="polite"></p>
         </article>
 
         <article id="complaints-panel" class="dashboard-card chart-card" aria-labelledby="complaints-heading">
           <div class="card-heading"><div><p class="eyebrow">Top 10</p><h2 id="complaints-heading">Complaint types</h2></div></div>
-          <div class="chart-wrap"><canvas id="complaints-chart" role="img" aria-label="Top complaint types chart"></canvas></div>
+          <div class="chart-wrap"><canvas id="complaints-chart" role="img" aria-label="Top complaint types chart" aria-describedby="complaints-summary"></canvas></div>
           <p id="complaints-summary" class="chart-summary"></p><p class="panel-state" aria-live="polite"></p>
         </article>
 
         <article id="descriptors-panel" class="dashboard-card chart-card" aria-labelledby="descriptors-heading">
           <div class="card-heading"><div><p class="eyebrow">Top 10</p><h2 id="descriptors-heading">Descriptors</h2></div></div>
-          <div class="chart-wrap"><canvas id="descriptors-chart" role="img" aria-label="Top descriptors chart"></canvas></div>
+          <div class="chart-wrap"><canvas id="descriptors-chart" role="img" aria-label="Top descriptors chart" aria-describedby="descriptors-summary"></canvas></div>
           <p id="descriptors-summary" class="chart-summary"></p><p class="panel-state" aria-live="polite"></p>
         </article>
       </section>
@@ -225,8 +231,8 @@
 
       <section id="view-map" class="view-panel" role="tabpanel" aria-labelledby="tab-map" tabindex="0" hidden>
         <article id="map-panel" class="dashboard-card map-card" aria-labelledby="map-heading">
-          <div class="card-heading"><div><p class="eyebrow">Newest geocoded requests</p><h2 id="map-heading">Request map</h2></div><p class="limit-note">Up to 250 points per applicable dataset</p></div>
-          <div id="request-map" aria-label="Map of recent 311 service requests"></div>
+          <div class="card-heading"><div><p class="eyebrow">Newest geocoded requests</p><h2 id="map-heading">Request map</h2></div><p id="map-limit-note" class="limit-note">Up to 250 points per applicable dataset</p></div>
+          <div id="request-map" role="region" aria-label="Map of recent 311 service requests" aria-describedby="map-limit-note"></div>
           <p class="panel-state" aria-live="polite"></p>
         </article>
       </section>
@@ -238,12 +244,12 @@
         </article>
         <article id="agencies-panel" class="dashboard-card chart-card" aria-labelledby="agencies-heading">
           <div class="card-heading"><div><p class="eyebrow">Top 10</p><h2 id="agencies-heading">Requests by agency</h2></div></div>
-          <div class="chart-wrap"><canvas id="agencies-chart" role="img" aria-label="Requests by agency chart"></canvas></div>
+          <div class="chart-wrap"><canvas id="agencies-chart" role="img" aria-label="Requests by agency chart" aria-describedby="agencies-summary"></canvas></div>
           <p id="agencies-summary" class="chart-summary"></p><p class="panel-state" aria-live="polite"></p>
         </article>
         <article id="statuses-panel" class="dashboard-card chart-card chart-card-wide" aria-labelledby="statuses-heading">
           <div class="card-heading"><div><p class="eyebrow">Request state</p><h2 id="statuses-heading">Requests by status</h2></div></div>
-          <div class="chart-wrap"><canvas id="statuses-chart" role="img" aria-label="Requests by status chart"></canvas></div>
+          <div class="chart-wrap"><canvas id="statuses-chart" role="img" aria-label="Requests by status chart" aria-describedby="statuses-summary"></canvas></div>
           <p id="statuses-summary" class="chart-summary"></p><p class="panel-state" aria-live="polite"></p>
         </article>
       </section>
@@ -251,12 +257,12 @@
       <section id="view-trends" class="view-panel dashboard-grid" role="tabpanel" aria-labelledby="tab-trends" tabindex="0" hidden>
         <article id="timeline-panel" class="dashboard-card chart-card chart-card-wide" aria-labelledby="timeline-heading">
           <div class="card-heading"><div><p class="eyebrow">All matching requests</p><h2 id="timeline-heading">Complaints over time</h2></div></div>
-          <div class="chart-wrap"><canvas id="timeline-chart" role="img" aria-label="Complaints over time chart"></canvas></div>
+          <div class="chart-wrap"><canvas id="timeline-chart" role="img" aria-label="Complaints over time chart" aria-describedby="timeline-summary"></canvas></div>
           <p id="timeline-summary" class="chart-summary"></p><p class="panel-state" aria-live="polite"></p>
         </article>
         <article id="comparison-panel" class="dashboard-card chart-card chart-card-wide" aria-labelledby="comparison-heading">
           <div class="card-heading"><div><p class="eyebrow">Selected or leading complaints</p><h2 id="comparison-heading">Compare complaint types</h2></div></div>
-          <div class="chart-wrap"><canvas id="comparison-chart" role="img" aria-label="Complaint type comparison chart"></canvas></div>
+          <div class="chart-wrap"><canvas id="comparison-chart" role="img" aria-label="Complaint type comparison chart" aria-describedby="comparison-summary"></canvas></div>
           <p id="comparison-summary" class="chart-summary"></p><p class="panel-state" aria-live="polite"></p>
         </article>
       </section>
@@ -264,7 +270,7 @@
       <section id="view-annual" class="view-panel" role="tabpanel" aria-labelledby="tab-annual" tabindex="0" hidden>
         <article id="annual-panel" class="dashboard-card chart-card" aria-labelledby="annual-heading">
           <div class="card-heading"><div><p class="eyebrow">Calendar year</p><h2 id="annual-heading">Annual request totals</h2></div></div>
-          <div class="chart-wrap chart-wrap-large"><canvas id="annual-chart" role="img" aria-label="Annual request totals chart"></canvas></div>
+          <div class="chart-wrap chart-wrap-large"><canvas id="annual-chart" role="img" aria-label="Annual request totals chart" aria-describedby="annual-summary"></canvas></div>
           <p id="annual-summary" class="chart-summary"></p><p class="panel-state" aria-live="polite"></p>
         </article>
       </section>
@@ -272,7 +278,7 @@
       <section id="view-monthly" class="view-panel" role="tabpanel" aria-labelledby="tab-monthly" tabindex="0" hidden>
         <article id="monthly-panel" class="dashboard-card chart-card" aria-labelledby="monthly-heading">
           <div class="card-heading"><div><p class="eyebrow">Seasonality</p><h2 id="monthly-heading">Requests by calendar month</h2></div></div>
-          <div class="chart-wrap chart-wrap-large"><canvas id="monthly-chart" role="img" aria-label="Requests by calendar month chart"></canvas></div>
+          <div class="chart-wrap chart-wrap-large"><canvas id="monthly-chart" role="img" aria-label="Requests by calendar month chart" aria-describedby="monthly-summary"></canvas></div>
           <p id="monthly-summary" class="chart-summary"></p><p class="panel-state" aria-live="polite"></p>
         </article>
       </section>
