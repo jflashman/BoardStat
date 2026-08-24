@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Experimental BoardStat dashboard powered by live NYC Open Data." />
+    <title>BoardStat Live Data Prototype</title>
+
+    <link rel="icon" href="./images/BetaNYC_short_white_on_blue.png" />
+    <link rel="stylesheet" href="./css/theme.css" />
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      crossorigin="anonymous"
+    />
+    <link rel="stylesheet" href="./css/prototype.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#dashboard">Skip to dashboard</a>
+
+    <header id="global-header" class="site-header">
+      <div id="nyc-top-header">
+        <div class="prototype-container top-header-content">
+          <p><a href="https://beta.nyc/">Beta.NYC</a> <span aria-hidden="true">|</span> BoardStat</p>
+          <ul class="header-links" aria-label="Project links">
+            <li><a href="https://github.com/BetaNYC/BoardStat/issues">Support</a></li>
+            <li><a href="https://beta.nyc/products/boardstat/">About</a></li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="prototype-container primary-header">
+        <a class="brand" href="./index.html" aria-label="BoardStat home">
+          <img
+            src="https://beta.nyc/wp-content/uploads/Sticker_BetaNYC_long_transp_back1-e1545958875486.png"
+            alt="BetaNYC"
+            width="178"
+            height="58"
+          />
+        </a>
+        <nav class="prototype-nav" aria-label="BoardStat boroughs">
+          <a href="./index.html">Home</a>
+          <a href="./bronx.html">The Bronx</a>
+          <a href="./brooklyn.html">Brooklyn</a>
+          <a href="./manhattan.html">Manhattan</a>
+          <a href="./queens.html">Queens</a>
+          <a href="./statenisland.html">Staten Island</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="dashboard" class="prototype-container dashboard-shell">
+      <section class="hero" aria-labelledby="page-title">
+        <div>
+          <p class="eyebrow">Live-data proof of concept</p>
+          <h1 id="page-title">Manhattan 311 dashboard</h1>
+          <p class="hero-copy">
+            Explore recent service requests by community board using data queried directly from NYC Open Data.
+          </p>
+        </div>
+        <p class="source-badge">
+          Source: <a href="https://data.cityofnewyork.us/Social-Services/311-Service-Requests-from-2020-to-Present/erm2-nwe9/about_data">NYC 311, 2020–present</a>
+        </p>
+      </section>
+
+      <aside class="prototype-notice" aria-label="Prototype notice">
+        <strong>Experimental:</strong> browser-native BoardStat prototype using live NYC Open Data. Existing BoardStat production pages are unchanged.
+      </aside>
+
+      <section class="filter-card" aria-labelledby="filter-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Filters</p>
+            <h2 id="filter-heading">Choose a district and date range</h2>
+          </div>
+          <button id="reset-filters" class="button-secondary" type="button">Reset filters</button>
+        </div>
+
+        <form id="filters" class="filter-grid">
+          <div class="form-field">
+            <label for="community-board">Community Board</label>
+            <select id="community-board" name="communityBoard">
+              <option>01 MANHATTAN</option>
+              <option>02 MANHATTAN</option>
+              <option>03 MANHATTAN</option>
+              <option>04 MANHATTAN</option>
+              <option>05 MANHATTAN</option>
+              <option>06 MANHATTAN</option>
+              <option selected>07 MANHATTAN</option>
+              <option>08 MANHATTAN</option>
+              <option>09 MANHATTAN</option>
+              <option>10 MANHATTAN</option>
+              <option>11 MANHATTAN</option>
+              <option>12 MANHATTAN</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="start-date">Start date</label>
+            <input id="start-date" name="startDate" type="date" min="2020-01-01" required />
+          </div>
+          <div class="form-field">
+            <label for="end-date">End date</label>
+            <input id="end-date" name="endDate" type="date" min="2020-01-01" required />
+          </div>
+        </form>
+        <p id="filter-error" class="form-error" role="alert" hidden></p>
+        <p id="dashboard-status" class="dashboard-status" role="status" aria-live="polite"></p>
+        <p id="active-range" class="active-range"></p>
+      </section>
+
+      <section class="dashboard-grid" aria-label="311 service request summary">
+        <article id="total-panel" class="dashboard-card total-card" aria-labelledby="total-heading">
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow">Service requests</p>
+              <h2 id="total-heading">Total requests</h2>
+            </div>
+          </div>
+          <p id="total-requests" class="metric" aria-live="polite">—</p>
+          <p class="panel-state" aria-live="polite"></p>
+        </article>
+
+        <article id="complaints-panel" class="dashboard-card chart-card" aria-labelledby="complaints-heading">
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow">Top 10</p>
+              <h2 id="complaints-heading">Complaint types</h2>
+            </div>
+          </div>
+          <div class="chart-wrap"><canvas id="complaints-chart" role="img" aria-label="Top complaint types chart"></canvas></div>
+          <p id="complaints-summary" class="chart-summary"></p>
+          <p class="panel-state" aria-live="polite"></p>
+        </article>
+
+        <article id="timeline-panel" class="dashboard-card chart-card chart-card-wide" aria-labelledby="timeline-heading">
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow">Volume</p>
+              <h2 id="timeline-heading">Complaints over time</h2>
+            </div>
+          </div>
+          <div class="chart-wrap"><canvas id="timeline-chart" role="img" aria-label="Complaints over time chart"></canvas></div>
+          <p id="timeline-summary" class="chart-summary"></p>
+          <p class="panel-state" aria-live="polite"></p>
+        </article>
+
+        <article id="agencies-panel" class="dashboard-card chart-card" aria-labelledby="agencies-heading">
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow">Top 10</p>
+              <h2 id="agencies-heading">Requests by agency</h2>
+            </div>
+          </div>
+          <div class="chart-wrap"><canvas id="agencies-chart" role="img" aria-label="Requests by agency chart"></canvas></div>
+          <p id="agencies-summary" class="chart-summary"></p>
+          <p class="panel-state" aria-live="polite"></p>
+        </article>
+
+        <article id="map-panel" class="dashboard-card map-card chart-card-wide" aria-labelledby="map-heading">
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow">Newest geocoded requests</p>
+              <h2 id="map-heading">Request map</h2>
+            </div>
+            <p class="limit-note">Up to 250 points</p>
+          </div>
+          <div id="request-map" aria-label="Map of recent 311 service requests"></div>
+          <p class="panel-state" aria-live="polite"></p>
+        </article>
+
+        <article id="recent-panel" class="dashboard-card table-card chart-card-wide" aria-labelledby="recent-heading">
+          <div class="card-heading">
+            <div>
+              <p class="eyebrow">Newest first</p>
+              <h2 id="recent-heading">Recent service requests</h2>
+            </div>
+            <p class="limit-note">Up to 75 requests</p>
+          </div>
+          <div class="table-scroll" tabindex="0" aria-label="Scrollable recent service requests table">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Created</th>
+                  <th scope="col">Complaint Type</th>
+                  <th scope="col">Descriptor</th>
+                  <th scope="col">Agency</th>
+                  <th scope="col">Address</th>
+                  <th scope="col">Status</th>
+                </tr>
+              </thead>
+              <tbody id="recent-requests-body"></tbody>
+            </table>
+          </div>
+          <p class="panel-state" aria-live="polite"></p>
+        </article>
+      </section>
+    </main>
+
+    <footer class="prototype-footer">
+      <div class="prototype-container">
+        <p>BoardStat is a BetaNYC civic technology project. Data is public and provided by NYC 311.</p>
+      </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
+    <script type="module" src="./js/dashboard.js"></script>
+  </body>
+</html>
