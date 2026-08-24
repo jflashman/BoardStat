@@ -33,7 +33,21 @@ In the meantime, you can browse our training materials.
  * [Training Videos](https://) - In development
  
 ## Data
-BoardStat is ingesting [NYC 311 Service Requests from 2010 to Present](https://data.cityofnewyork.us/Social-Services/311-Service-Requests-from-2010-to-Present/erm2-nwe9) dataset directly from the city’s open data portal. Data is filtered by the Community Board column.
+The browser-native prototype queries NYC Open Data's [2010–2019](https://data.cityofnewyork.us/Social-Services/311-Service-Requests-from-2010-to-2019/76ig-c548/about_data) and [2020–present](https://data.cityofnewyork.us/Social-Services/311-Service-Requests-from-2020-to-Present/erm2-nwe9/about_data) 311 datasets directly. Data is filtered by both the borough and Community Board columns.
+
+## Browser-native prototype development
+
+Serve the repository without a build step:
+
+```bash
+python3 -m http.server 8000
+```
+
+Then open `http://localhost:8000/prototype.html`. Run the dependency-free API regression suite with:
+
+```bash
+node --test tests/api.test.mjs
+```
 
 # Change Log
 

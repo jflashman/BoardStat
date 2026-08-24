@@ -11,9 +11,11 @@ export const FILTER_OPTION_LIMIT = 5000;
 
 const API_ROOT = "https://data.cityofnewyork.us/resource";
 const EARLIEST_DATE = DATASETS.historical.start;
+const MAX_CACHE_ENTRIES = 100;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/;
 const responseCache = new Map();
+const inFlightRequests = new Map();
 
 const DIMENSIONS = Object.freeze({
   boards: "community_board",
@@ -154,10 +156,7 @@ function buildUrl(parameters, datasetId) {
   return `${API_ROOT}/${datasetId}.json?${search.toString()}`;
 }
 
-async function query(parameters, { signal, datasetId = DATASETS.current.id } = {}) {
-  const url = buildUrl(parameters, datasetId);
-  if (responseCache.has(url)) return responseCache.get(url);
-
+async function fetchRows(url, signal) {
   let response;
   try {
     response = await fetch(url, { signal, headers: { Accept: "application/json" } });
@@ -177,17 +176,91 @@ async function query(parameters, { signal, datasetId = DATASETS.current.id } = {
     throw new SocrataError(`NYC Open Data returned an error (${response.status}).${detail}`, response.status);
   }
 
-  const rows = await response.json();
+  return response.json();
+}
+
+function cacheRows(url, rows) {
   responseCache.set(url, rows);
-  return rows;
+  if (responseCache.size > MAX_CACHE_ENTRIES) {
+    responseCache.delete(responseCache.keys().next().value);
+  }
+}
+
+function getInFlightRequest(url) {
+  if (inFlightRequests.has(url)) return inFlightRequests.get(url);
+  const controller = new AbortController();
+  const entry = { controller, subscribers: 0, promise: null };
+  entry.promise = fetchRows(url, controller.signal)
+    .then((rows) => {
+      cacheRows(url, rows);
+      return rows;
+    })
+    .finally(() => {
+      if (inFlightRequests.get(url) === entry) inFlightRequests.delete(url);
+    });
+  inFlightRequests.set(url, entry);
+  return entry;
+}
+
+function subscribeToRequest(entry, signal) {
+  entry.subscribers += 1;
+  return new Promise((resolve, reject) => {
+    let active = true;
+    const cleanup = () => {
+      if (!active) return false;
+      active = false;
+      signal?.removeEventListener("abort", handleAbort);
+      entry.subscribers -= 1;
+      return true;
+    };
+    const handleAbort = () => {
+      if (!cleanup()) return;
+      if (entry.subscribers === 0) entry.controller.abort();
+      reject(signal.reason || new DOMException("The request was aborted.", "AbortError"));
+    };
+    signal?.addEventListener("abort", handleAbort, { once: true });
+    entry.promise.then(
+      (rows) => {
+        if (cleanup()) resolve(rows);
+      },
+      (error) => {
+        if (cleanup()) reject(error);
+      },
+    );
+  });
+}
+
+async function query(parameters, { signal, datasetId = DATASETS.current.id } = {}) {
+  const url = buildUrl(parameters, datasetId);
+  if (signal?.aborted) throw signal.reason || new DOMException("The request was aborted.", "AbortError");
+  if (responseCache.has(url)) {
+    const rows = responseCache.get(url);
+    responseCache.delete(url);
+    responseCache.set(url, rows);
+    return rows;
+  }
+  return subscribeToRequest(getInFlightRequest(url), signal);
 }
 
 async function querySlices(filters, parameterFactory, options = {}) {
   const slices = getDatasetSlices(filters);
-  return Promise.all(slices.map(async (slice) => ({
-    slice,
-    rows: await query(parameterFactory(slice), { ...options, datasetId: slice.dataset.id }),
-  })));
+  const controller = new AbortController();
+  const callerSignal = options.signal;
+  const abortFromCaller = () => controller.abort(callerSignal.reason);
+  if (callerSignal?.aborted) abortFromCaller();
+  else callerSignal?.addEventListener("abort", abortFromCaller, { once: true });
+
+  try {
+    return await Promise.all(slices.map(async (slice) => ({
+      slice,
+      rows: await query(parameterFactory(slice), { ...options, signal: controller.signal, datasetId: slice.dataset.id }),
+    })));
+  } catch (error) {
+    controller.abort();
+    throw error;
+  } finally {
+    callerSignal?.removeEventListener("abort", abortFromCaller);
+  }
 }
 
 function mergeCounts(resultSets, getKey, makeRow) {
