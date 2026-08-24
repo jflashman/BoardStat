@@ -1,20 +1,31 @@
-const MANHATTAN_CENTER = [40.7831, -73.9712];
+const DEFAULT_CENTER = [40.7128, -74.006];
 let map;
 let requestLayer;
+let routeCenter = DEFAULT_CENTER;
 
 function requireLeaflet() {
   if (!window.L) throw new Error("Leaflet did not load.");
+  if (!window.L.markerClusterGroup) throw new Error("Leaflet marker clustering did not load.");
 }
 
 function initializeMap() {
   if (map) return;
   requireLeaflet();
-  map = window.L.map("request-map", { scrollWheelZoom: false }).setView(MANHATTAN_CENTER, 11);
+  map = window.L.map("request-map", { scrollWheelZoom: false }).setView(routeCenter, 11);
   window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   }).addTo(map);
-  requestLayer = window.L.layerGroup().addTo(map);
+  requestLayer = window.L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 45 }).addTo(map);
+}
+
+function createRequestIcon() {
+  return window.L.divIcon({
+    className: "request-marker-shell",
+    html: '<span class="request-marker-dot" aria-hidden="true"></span>',
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+  });
 }
 
 function addTextLine(container, text, className = "map-popup-detail") {
@@ -44,10 +55,12 @@ function createPopup(point) {
     addTextLine(popup, formatSocrataDateTime(point.created_date));
   }
   addTextLine(popup, point.unique_key ? `Request ${point.unique_key}` : "");
+  addTextLine(popup, point.datasetLabel ? `Dataset: ${point.datasetLabel}` : "");
   return popup;
 }
 
-export function renderMapPoints(points) {
+export function renderMapPoints(points, center = DEFAULT_CENTER) {
+  routeCenter = center;
   initializeMap();
   requestLayer.clearLayers();
 
@@ -58,12 +71,9 @@ export function renderMapPoints(points) {
     if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
 
     const location = [latitude, longitude];
-    window.L.circleMarker(location, {
-      radius: 5,
-      color: "#ffffff",
-      weight: 1,
-      fillColor: "#3b6cf6",
-      fillOpacity: 0.78,
+    window.L.marker(location, {
+      alt: point.complaint_type || "311 service request",
+      icon: createRequestIcon(),
     })
       .bindPopup(createPopup(point))
       .addTo(requestLayer);
@@ -73,7 +83,7 @@ export function renderMapPoints(points) {
   if (bounds.length) {
     map.fitBounds(bounds, { padding: [24, 24], maxZoom: 15 });
   } else {
-    map.setView(MANHATTAN_CENTER, 11);
+    map.setView(routeCenter, 11);
   }
 
   window.setTimeout(() => map.invalidateSize(), 0);

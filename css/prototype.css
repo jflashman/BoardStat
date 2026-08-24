@@ -136,6 +136,30 @@ select:focus-visible,
   font-size: 1.1rem;
 }
 
+.hero-tools {
+  display: grid;
+  flex: 0 0 min(290px, 100%);
+  gap: 0.75rem;
+}
+
+.route-selector {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--boardstat-ink-muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.route-selector select {
+  min-height: 44px;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #6c7890;
+  border-radius: 2px;
+  color: var(--boardstat-navy);
+  background: #fff;
+  font: inherit;
+}
+
 .eyebrow {
   margin: 0 0 0.3rem;
   color: var(--boardstat-purple);
@@ -153,8 +177,7 @@ select:focus-visible,
 }
 
 .source-badge {
-  flex: 0 0 auto;
-  max-width: 260px;
+  max-width: 290px;
   padding: 0.75rem 1rem;
   border: 1px solid var(--boardstat-border);
   border-radius: 999px;
@@ -541,6 +564,21 @@ select:focus-visible,
   margin: 0.15rem 0;
 }
 
+.request-marker-shell {
+  border: 0;
+  background: transparent;
+}
+
+.request-marker-dot {
+  display: block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--boardstat-bright-blue);
+  box-shadow: 0 1px 4px rgba(10, 20, 56, 0.4);
+}
+
 .address-search-card {
   margin-bottom: 1.25rem;
 }
@@ -697,6 +735,10 @@ tbody tr:hover {
 
   .source-badge {
     max-width: none;
+  }
+
+  .hero-tools {
+    width: 100%;
   }
 
   .view-nav,

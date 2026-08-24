@@ -4,14 +4,16 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="Experimental BoardStat dashboard powered by live NYC Open Data." />
-    <title>BoardStat Manhattan Feature Prototype</title>
+    <title>BoardStat Historical and Borough Prototype</title>
 
     <link rel="icon" href="./images/BetaNYC_short_white_on_blue.png" />
     <link rel="stylesheet" href="./css/theme.css" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" crossorigin="anonymous" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" crossorigin="anonymous" />
     <link rel="stylesheet" href="./css/prototype.css" />
   </head>
-  <body>
+  <body data-borough="manhattan">
     <a class="skip-link" href="#dashboard">Skip to dashboard</a>
 
     <header id="global-header" class="site-header">
@@ -48,13 +50,25 @@
     <main id="dashboard" class="prototype-container dashboard-shell">
       <section class="hero" aria-labelledby="page-title">
         <div>
-          <p class="eyebrow">Milestone 2 prototype</p>
+          <p class="eyebrow">Milestone 3 prototype</p>
           <h1 id="page-title">Manhattan 311 dashboard</h1>
-          <p class="hero-copy">Explore service requests across synchronized BoardStat views using live NYC Open Data.</p>
+          <p class="hero-copy">Explore service requests from 2010 to the present across synchronized BoardStat views using live NYC Open Data.</p>
         </div>
-        <p class="source-badge">
-          Source: <a href="https://data.cityofnewyork.us/Social-Services/311-Service-Requests-from-2020-to-Present/erm2-nwe9/about_data">NYC 311, 2020–present</a>
-        </p>
+        <div class="hero-tools">
+          <label class="route-selector" for="borough-route">Preview borough route
+            <select id="borough-route">
+              <option value="bronx">The Bronx</option>
+              <option value="brooklyn">Brooklyn</option>
+              <option value="manhattan">Manhattan</option>
+              <option value="queens">Queens</option>
+              <option value="statenisland">Staten Island</option>
+            </select>
+          </label>
+          <p class="source-badge">
+            Sources: <a href="https://data.cityofnewyork.us/Social-Services/311-Service-Requests-from-2010-to-2019/76ig-c548/about_data">2010–2019</a>
+            and <a href="https://data.cityofnewyork.us/Social-Services/311-Service-Requests-from-2020-to-Present/erm2-nwe9/about_data">2020–present</a>
+          </p>
+        </div>
       </section>
 
       <aside class="prototype-notice" aria-label="Prototype notice">
@@ -88,11 +102,11 @@
             <div class="date-filter-grid">
               <div class="form-field">
                 <label for="start-date">Start date</label>
-                <input id="start-date" name="startDate" type="date" min="2020-01-01" required />
+                <input id="start-date" name="startDate" type="date" min="2010-01-01" required />
               </div>
               <div class="form-field">
                 <label for="end-date">End date</label>
-                <input id="end-date" name="endDate" type="date" min="2020-01-01" required />
+                <input id="end-date" name="endDate" type="date" min="2010-01-01" required />
               </div>
             </div>
 
@@ -201,7 +215,7 @@
           <div class="table-scroll" tabindex="0" aria-label="Scrollable matching service requests table">
             <table>
               <caption class="visually-hidden">Newest NYC 311 requests matching the shared filters</caption>
-              <thead><tr><th scope="col">Created</th><th scope="col">Closed</th><th scope="col">Board</th><th scope="col">Complaint Type</th><th scope="col">Descriptor</th><th scope="col">Agency</th><th scope="col">Address</th><th scope="col">Status</th></tr></thead>
+              <thead><tr><th scope="col">Created</th><th scope="col">Closed</th><th scope="col">Board</th><th scope="col">Complaint Type</th><th scope="col">Descriptor</th><th scope="col">Agency</th><th scope="col">Address</th><th scope="col">Status</th><th scope="col">Dataset</th></tr></thead>
               <tbody id="recent-requests-body"></tbody>
             </table>
           </div>
@@ -211,7 +225,7 @@
 
       <section id="view-map" class="view-panel" role="tabpanel" aria-labelledby="tab-map" tabindex="0" hidden>
         <article id="map-panel" class="dashboard-card map-card" aria-labelledby="map-heading">
-          <div class="card-heading"><div><p class="eyebrow">Newest geocoded requests</p><h2 id="map-heading">Request map</h2></div><p class="limit-note">Up to 250 points</p></div>
+          <div class="card-heading"><div><p class="eyebrow">Newest geocoded requests</p><h2 id="map-heading">Request map</h2></div><p class="limit-note">Up to 250 points per applicable dataset</p></div>
           <div id="request-map" aria-label="Map of recent 311 service requests"></div>
           <p class="panel-state" aria-live="polite"></p>
         </article>
@@ -268,6 +282,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" crossorigin="anonymous"></script>
     <script type="module" src="./js/dashboard.js"></script>
   </body>
 </html>

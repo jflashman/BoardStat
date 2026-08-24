@@ -1,10 +1,10 @@
 import {
-  MANHATTAN_BOARDS,
   getAgencyBreakdown,
   getAnnualBreakdown,
   getAverageDaysToClose,
   getBoardBreakdown,
   getComplaintTimeline,
+  getDatasetSummary,
   getDescriptorBreakdown,
   getFilterOptions,
   getMapPoints,
@@ -17,6 +17,7 @@ import {
   searchAddresses,
   validateFilters,
 } from "./api.js";
+import { BOROUGHS, getBoroughConfig } from "./boroughs.js";
 import {
   renderAgencyChart,
   renderAnnualChart,
@@ -30,7 +31,8 @@ import {
 } from "./charts.js";
 import { renderMapPoints } from "./map.js";
 
-const DEFAULT_BOARD = "07 MANHATTAN";
+const routeParameter = new URLSearchParams(window.location.search).get("borough");
+const ROUTE = getBoroughConfig(routeParameter) || getBoroughConfig(document.body.dataset.borough) || BOROUGHS.manhattan;
 const REFRESH_DELAY = 350;
 const OPTION_REFRESH_DELAY = 650;
 const ADDRESS_SEARCH_DELAY = 350;
@@ -87,6 +89,8 @@ const elements = {
   selectedAddresses: document.getElementById("selected-addresses"),
   clearAddresses: document.getElementById("clear-addresses"),
   sharedFilterPanel: document.getElementById("shared-filter-panel"),
+  boroughRoute: document.getElementById("borough-route"),
+  pageTitle: document.getElementById("page-title"),
 };
 
 let state;
@@ -110,7 +114,8 @@ function getDefaultState() {
   const start = new Date(end);
   start.setDate(start.getDate() - 29);
   return {
-    boards: [DEFAULT_BOARD],
+    borough: ROUTE.slug,
+    boards: document.body.dataset.defaultBoards === "all" ? [...ROUTE.boards] : [ROUTE.defaultBoard],
     complaints: [],
     descriptors: [],
     agencies: [],
@@ -130,11 +135,11 @@ function uniqueStrings(values, maximum = 25) {
 function parseUrlState() {
   const defaults = getDefaultState();
   const parameters = new URLSearchParams(window.location.search);
-  const boards = uniqueStrings(parameters.getAll("board")).filter((board) => MANHATTAN_BOARDS.includes(board));
+  const boards = uniqueStrings(parameters.getAll("board")).filter((board) => ROUTE.boards.includes(board));
   const years = parameters
     .getAll("year")
     .map(Number)
-    .filter((year) => Number.isInteger(year) && year >= 2020 && year <= new Date().getFullYear());
+    .filter((year) => Number.isInteger(year) && year >= 2010 && year <= new Date().getFullYear());
 
   const nextState = {
     ...defaults,
@@ -160,6 +165,7 @@ function parseUrlState() {
 
 function toApiFilters(source = state) {
   return {
+    borough: ROUTE.slug,
     boards: [...source.boards],
     complaints: [...source.complaints],
     descriptors: [...source.descriptors],
@@ -174,6 +180,7 @@ function toApiFilters(source = state) {
 
 function writeUrl({ push = false } = {}) {
   const parameters = new URLSearchParams();
+  if (ROUTE !== BOROUGHS.manhattan) parameters.set("borough", ROUTE.slug);
   Object.entries(URL_PARAMETERS).forEach(([stateKey, parameter]) => {
     state[stateKey].forEach((value) => parameters.append(parameter, String(value)));
   });
@@ -203,10 +210,10 @@ function readFormState() {
 }
 
 function optionRowsFor(filterName) {
-  if (filterName === "boards") return MANHATTAN_BOARDS.map((label) => ({ label }));
+  if (filterName === "boards") return ROUTE.boards.map((label) => ({ label }));
   if (filterName === "years") {
     const rows = [];
-    for (let year = 2020; year <= new Date().getFullYear(); year += 1) rows.push({ label: String(year) });
+    for (let year = 2010; year <= new Date().getFullYear(); year += 1) rows.push({ label: String(year) });
     return rows;
   }
   return lastFilterOptions[filterName] || [];
@@ -278,6 +285,7 @@ function syncFormFromState() {
 
 function selectionSummaryItems() {
   const items = [
+    `Borough route: ${ROUTE.name}`,
     `Date range: ${state.startDate} through ${state.endDate}`,
     `${FILTER_LABELS.boards}: ${state.boards.join(", ") || "None"}`,
   ];
@@ -293,7 +301,14 @@ function renderStateSummary() {
   const start = dateFormatter.format(new Date(`${state.startDate}T00:00:00Z`));
   const end = dateFormatter.format(new Date(`${state.endDate}T00:00:00Z`));
   const boardSummary = state.boards.length <= 3 ? state.boards.join(", ") : `${state.boards.length} boards`;
-  elements.activeRange.textContent = `${boardSummary} · ${start}–${end} (inclusive) · Dataset erm2-nwe9`;
+  let datasetText = "dataset unavailable until filters are valid";
+  try {
+    const datasets = getDatasetSummary(toApiFilters());
+    datasetText = datasets.ids.length ? `datasets ${datasets.ids.join(" + ")}` : "no applicable dataset";
+  } catch {
+    // The validation message provides the actionable detail.
+  }
+  elements.activeRange.textContent = `${ROUTE.name} · ${boardSummary} · ${start}–${end} (inclusive) · ${datasetText}`;
 
   const fragment = document.createDocumentFragment();
   selectionSummaryItems().forEach((item) => {
@@ -413,7 +428,7 @@ function renderRecentRequests(rows) {
     const row = document.createElement("tr");
     row.className = "empty-row";
     const cell = document.createElement("td");
-    cell.colSpan = 8;
+    cell.colSpan = 9;
     cell.textContent = "No service requests match these filters.";
     row.append(cell);
     elements.recentBody.append(row);
@@ -432,6 +447,7 @@ function renderRecentRequests(rows) {
       valueOrDash(request.agency),
       valueOrDash(request.incident_address),
       valueOrDash(request.status),
+      valueOrDash(request.datasetLabel),
     ].forEach((value) => {
       const cell = document.createElement("td");
       cell.textContent = value;
@@ -462,8 +478,14 @@ function viewTasks(filters, options) {
         "map-panel",
         () => getMapPoints(filters, options),
         (points) => {
-          const count = renderMapPoints(points);
-          getPanel("map-panel").querySelector(".limit-note").textContent = count ? `${numberFormatter.format(count)} of up to 250 points` : "Up to 250 points";
+          const count = renderMapPoints(points, ROUTE.center);
+          const datasets = getDatasetSummary(filters);
+          const maximum = 250 * datasets.count;
+          getPanel("map-panel").querySelector(".limit-note").textContent = !datasets.count
+            ? "No dataset overlaps the selected dates and years"
+            : count
+            ? `${numberFormatter.format(count)} of up to ${numberFormatter.format(maximum)} points (${datasets.count} dataset${datasets.count === 1 ? "" : "s"})`
+            : `Up to 250 points per applicable dataset`;
         },
         "No geocoded requests match these filters.",
       )];
@@ -527,7 +549,7 @@ async function refreshCurrentView() {
   const failures = results.filter((result) => result === "failed").length;
   elements.status.textContent = failures
     ? `View refreshed with ${failures} panel${failures === 1 ? "" : "s"} unavailable.`
-    : "View updated with live NYC Open Data.";
+    : "View updated with live NYC Open Data across every applicable dataset.";
 }
 
 async function refreshFilterOptions() {
@@ -717,6 +739,18 @@ document.querySelectorAll("[data-view]").forEach((button) => {
         : (currentIndex + (event.key === "ArrowRight" ? 1 : -1) + VIEWS.length) % VIEWS.length;
     document.querySelector(`[data-view="${VIEWS[targetIndex]}"]`).focus();
   });
+});
+
+elements.boroughRoute.value = ROUTE.slug;
+elements.pageTitle.textContent = `${ROUTE.name} 311 dashboard`;
+document.title = `BoardStat ${ROUTE.name} Historical Prototype`;
+elements.boroughRoute.addEventListener("change", () => {
+  const nextRoute = getBoroughConfig(elements.boroughRoute.value);
+  if (!nextRoute || nextRoute === ROUTE) return;
+  const url = new URL(window.location.href);
+  url.search = "";
+  if (nextRoute !== BOROUGHS.manhattan) url.searchParams.set("borough", nextRoute.slug);
+  window.location.assign(url);
 });
 
 window.addEventListener("popstate", () => {
