@@ -28,8 +28,8 @@ import {
   renderMonthlyChart,
   renderStatusChart,
   renderTimelineChart,
-} from "./charts.js";
-import { renderMapPoints } from "./map.js";
+} from "./charts.js?v=20260826-1";
+import { renderMapPoints } from "./map.js?v=20260826-1";
 
 const configuredRoute = getBoroughConfig(document.body.dataset.borough);
 const routeParameter = new URLSearchParams(window.location.search).get("borough");
