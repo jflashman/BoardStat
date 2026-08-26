@@ -27,7 +27,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" crossorigin="anonymous" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" crossorigin="anonymous" />
-    <link rel="stylesheet" href="./css/prototype.css?v=20260826-1" />
+    <link rel="stylesheet" href="./css/prototype.css?v=20260826-3" />
     <!-- Global site tag (gtag.js) - Google Analytics -->
     <!-- Google tag (gtag.js) -->
     <script
@@ -346,6 +346,24 @@
           <div class="chart-wrap"><canvas id="descriptors-chart" role="img" aria-label="Top descriptors chart" aria-describedby="descriptors-summary"></canvas></div>
           <p id="descriptors-summary" class="chart-summary"></p><p class="panel-state" aria-live="polite"></p>
         </article>
+
+        <details id="rankings-details" class="dashboard-card disclosure-card chart-card-wide">
+          <summary><span><span class="eyebrow">Optional analysis</span><strong>Detailed complaint and address rankings</strong></span></summary>
+          <p>These aggregate tables load only when this section is open. Explicit actions update the shared filters.</p>
+          <div class="detail-grid">
+            <article id="complaint-pairs-panel" class="detail-panel" aria-labelledby="complaint-pairs-heading">
+              <h2 id="complaint-pairs-heading">Complaint and descriptor pairs</h2>
+              <div class="table-scroll" tabindex="0" aria-label="Scrollable complaint and descriptor rankings table"><table><caption class="visually-hidden">Top complaint and descriptor pairs</caption><thead><tr><th scope="col">Complaint Type</th><th scope="col">Descriptor</th><th scope="col">Requests</th><th scope="col">Action</th></tr></thead><tbody id="complaint-pairs-body"></tbody></table></div>
+              <p class="panel-state" aria-live="polite"></p>
+            </article>
+            <article id="address-ranking-panel" class="detail-panel" aria-labelledby="address-ranking-heading">
+              <h2 id="address-ranking-heading">Leading incident addresses</h2>
+              <p id="address-ranking-note" class="option-note"></p>
+              <div class="table-scroll" tabindex="0" aria-label="Scrollable leading incident addresses table"><table><caption class="visually-hidden">Leading incident addresses</caption><thead><tr><th scope="col">Address</th><th scope="col">Requests</th><th scope="col">Actions</th></tr></thead><tbody id="address-ranking-body"></tbody></table></div>
+              <p class="panel-state" aria-live="polite"></p>
+            </article>
+          </div>
+        </details>
       </section>
 
       <section id="view-address" class="view-panel" role="tabpanel" aria-labelledby="tab-address" tabindex="0" hidden>
@@ -359,6 +377,25 @@
           <div class="selected-address-heading"><h3>Selected addresses</h3><button id="clear-addresses" class="text-button" type="button">Clear all</button></div>
           <div id="selected-addresses" class="filter-chips"><p class="option-note">No addresses selected.</p></div>
         </article>
+
+        <aside id="address-analysis-guidance" class="prototype-notice">Select at least one exact incident-address spelling to load address-specific charts. Selecting multiple spellings combines them without changing the source values.</aside>
+        <div id="address-analysis" class="dashboard-grid address-analysis" hidden>
+          <article id="address-timeline-panel" class="dashboard-card chart-card chart-card-wide" aria-labelledby="address-timeline-heading">
+            <div class="card-heading"><div><p class="eyebrow">Selected addresses</p><h2 id="address-timeline-heading">Requests over time</h2></div></div>
+            <div class="chart-wrap"><canvas id="address-timeline-chart" role="img" aria-label="Selected address requests over time chart" aria-describedby="address-timeline-summary"></canvas></div>
+            <p id="address-timeline-summary" class="chart-summary"></p><p class="panel-state" aria-live="polite"></p>
+          </article>
+          <article id="address-complaints-panel" class="dashboard-card chart-card" aria-labelledby="address-complaints-heading">
+            <div class="card-heading"><div><p class="eyebrow">Selected addresses</p><h2 id="address-complaints-heading">Complaint types</h2></div></div>
+            <div class="chart-wrap"><canvas id="address-complaints-chart" role="img" aria-label="Complaint types at selected addresses chart" aria-describedby="address-complaints-summary"></canvas></div>
+            <p id="address-complaints-summary" class="chart-summary"></p><p class="panel-state" aria-live="polite"></p>
+          </article>
+          <article id="address-descriptors-panel" class="dashboard-card chart-card" aria-labelledby="address-descriptors-heading">
+            <div class="card-heading"><div><p class="eyebrow">Explicit complaint filter required</p><h2 id="address-descriptors-heading">Descriptor trends</h2></div></div>
+            <div class="chart-wrap"><canvas id="address-descriptors-chart" role="img" aria-label="Descriptor trends at selected addresses chart" aria-describedby="address-descriptors-summary"></canvas></div>
+            <p id="address-descriptors-summary" class="chart-summary">Choose a complaint type in Shared filters to load descriptor trends.</p><p class="panel-state" aria-live="polite"></p>
+          </article>
+        </div>
 
         <article id="address-results-panel" class="dashboard-card table-card" aria-labelledby="recent-heading">
           <div class="card-heading"><div><p class="eyebrow">Newest first</p><h2 id="recent-heading">Matching service requests</h2></div><p class="limit-note">Up to 100 requests</p></div>
@@ -374,8 +411,9 @@
       </section>
 
       <section id="view-map" class="view-panel" role="tabpanel" aria-labelledby="tab-map" tabindex="0" hidden>
+        <fieldset class="mode-control"><legend>Map mode</legend><label><input type="radio" name="map-mode" value="requests" checked /> Recent requests</label><label><input type="radio" name="map-mode" value="hotspots" /> Hotspots</label></fieldset>
         <article id="map-panel" class="dashboard-card map-card" aria-labelledby="map-heading">
-          <div class="card-heading"><div><p class="eyebrow">Newest geocoded requests</p><h2 id="map-heading">Request map</h2></div><p id="map-limit-note" class="limit-note">Up to 250 points per applicable dataset</p></div>
+          <div class="card-heading"><div><p id="map-eyebrow" class="eyebrow">Newest geocoded requests</p><h2 id="map-heading">Request map</h2></div><p id="map-limit-note" class="limit-note">Up to 250 points per applicable dataset</p></div>
           <div id="request-map" role="region" aria-label="Map of recent 311 service requests" aria-describedby="map-limit-note"></div>
           <p class="panel-state" aria-live="polite"></p>
         </article>
@@ -396,6 +434,14 @@
           <div class="chart-wrap"><canvas id="statuses-chart" role="img" aria-label="Requests by status chart" aria-describedby="statuses-summary"></canvas></div>
           <p id="statuses-summary" class="chart-summary"></p><p class="panel-state" aria-live="polite"></p>
         </article>
+        <details id="agency-status-details" class="dashboard-card disclosure-card chart-card-wide">
+          <summary><span><span class="eyebrow">Optional analysis</span><strong>Status by agency</strong></span></summary>
+          <p>Compare the status composition of the ten leading agencies without changing the shared filters.</p>
+          <div class="chart-wrap chart-wrap-large"><canvas id="agency-status-chart" role="img" aria-label="Status by agency stacked chart" aria-describedby="agency-status-summary"></canvas></div>
+          <p id="agency-status-summary" class="chart-summary"></p>
+          <div class="table-scroll" tabindex="0" aria-label="Scrollable status by agency table"><table><caption class="visually-hidden">Exact status counts for the leading agencies</caption><thead id="agency-status-head"></thead><tbody id="agency-status-body"></tbody></table></div>
+          <p class="panel-state" aria-live="polite"></p>
+        </details>
       </section>
 
       <section id="view-trends" class="view-panel dashboard-grid" role="tabpanel" aria-labelledby="tab-trends" tabindex="0" hidden>
@@ -420,10 +466,18 @@
       </section>
 
       <section id="view-monthly" class="view-panel" role="tabpanel" aria-labelledby="tab-monthly" tabindex="0" hidden>
+        <fieldset class="mode-control"><legend>Monthly analysis</legend><label><input type="radio" name="monthly-mode" value="totals" checked /> Monthly totals</label><label><input type="radio" name="monthly-mode" value="complaints" /> Complaint mix</label></fieldset>
         <article id="monthly-panel" class="dashboard-card chart-card" aria-labelledby="monthly-heading">
           <div class="card-heading"><div><p class="eyebrow">Seasonality</p><h2 id="monthly-heading">Requests by calendar month</h2></div></div>
           <div class="chart-wrap chart-wrap-large"><canvas id="monthly-chart" role="img" aria-label="Requests by calendar month chart" aria-describedby="monthly-summary"></canvas></div>
           <p id="monthly-summary" class="chart-summary"></p><p class="panel-state" aria-live="polite"></p>
+        </article>
+        <article id="monthly-complaints-panel" class="dashboard-card chart-card" aria-labelledby="monthly-complaints-heading" hidden>
+          <div class="card-heading"><div><p class="eyebrow">Optional comparison</p><h2 id="monthly-complaints-heading">Complaint mix by calendar month</h2></div></div>
+          <div class="chart-wrap chart-wrap-large"><canvas id="monthly-complaints-chart" role="img" aria-label="Complaint mix by calendar month chart" aria-describedby="monthly-complaints-summary"></canvas></div>
+          <p id="monthly-complaints-summary" class="chart-summary"></p>
+          <div class="table-scroll" tabindex="0" aria-label="Scrollable monthly complaint leaders table"><table><caption class="visually-hidden">Leading complaint type for each calendar month</caption><thead><tr><th scope="col">Month</th><th scope="col">Leading Complaint Type</th><th scope="col">Requests</th></tr></thead><tbody id="monthly-leaders-body"></tbody></table></div>
+          <p class="panel-state" aria-live="polite"></p>
         </article>
       </section>
     </main>
@@ -453,6 +507,6 @@
     <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" crossorigin="anonymous"></script>
     <script src="https://unpkg.com/esri-leaflet@3.0.19/dist/esri-leaflet.js" crossorigin="anonymous"></script>
     <script src="https://unpkg.com/esri-leaflet-vector@4.3.0/dist/esri-leaflet-vector.js" crossorigin="anonymous"></script>
-    <script type="module" src="./js/dashboard.js?v=20260826-1"></script>
+    <script type="module" src="./js/dashboard.js?v=20260826-3"></script>
   </body>
 </html>

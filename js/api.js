@@ -8,6 +8,8 @@ export const DATASETS = Object.freeze({
 export const MAP_POINT_LIMIT = 250;
 export const RECENT_REQUEST_LIMIT = 100;
 export const FILTER_OPTION_LIMIT = 5000;
+export const RANKING_CANDIDATE_LIMIT = 1000;
+export const HOTSPOT_LIMIT = 100;
 
 const API_ROOT = "https://data.cityofnewyork.us/resource";
 const EARLIEST_DATE = DATASETS.historical.start;
@@ -277,6 +279,14 @@ function mergeDimensionCounts(resultSets, field) {
     .sort((first, second) => second.count - first.count || first.label.localeCompare(second.label));
 }
 
+function mergeTupleCounts(resultSets, fields, makeRow) {
+  return mergeCounts(
+    resultSets,
+    (row) => fields.map((field) => row[field] || "Unknown").join("\u0000"),
+    (key, count) => makeRow(key.split("\u0000"), count),
+  ).sort((first, second) => second.count - first.count);
+}
+
 async function getDimensionBreakdown(filters, filterName, options) {
   const field = DIMENSIONS[filterName];
   const results = await querySlices(filters, (slice) => ({
@@ -317,6 +327,35 @@ export function getBoardBreakdown(filters, options) {
   return getDimensionBreakdown(filters, "boards", options);
 }
 
+export async function getComplaintDescriptorBreakdown(filters, options) {
+  const results = await querySlices(filters, (slice) => ({
+    select: "complaint_type, descriptor, count(*) AS count",
+    where: buildWhere(filters, slice, ["complaint_type IS NOT NULL", "descriptor IS NOT NULL"]),
+    group: "complaint_type, descriptor",
+    order: "count DESC",
+    limit: FILTER_OPTION_LIMIT,
+  }), options);
+  return mergeTupleCounts(
+    results,
+    ["complaint_type", "descriptor"],
+    ([complaintType, descriptor], count) => ({ complaintType, descriptor, count }),
+  ).slice(0, 30);
+}
+
+export async function getAddressBreakdown(filters, options) {
+  const results = await querySlices(filters, (slice) => ({
+    select: "incident_address, count(*) AS count",
+    where: buildWhere(filters, slice, ["incident_address IS NOT NULL"]),
+    group: "incident_address",
+    order: "count DESC",
+    limit: RANKING_CANDIDATE_LIMIT,
+  }), options);
+  return {
+    rows: mergeDimensionCounts(results, "incident_address").slice(0, 30),
+    isCandidateRanking: results.length > 1,
+  };
+}
+
 export async function getTimeline(filters, options) {
   const granularity = daysInRange(filters.startDate, filters.endDate) <= 90 ? "day" : "month";
   const bucket = granularity === "day" ? "date_trunc_ymd(created_date)" : "date_trunc_ym(created_date)";
@@ -351,6 +390,34 @@ export async function getComplaintTimeline(filters, complaintTypes, options) {
     },
   ).sort((first, second) => first.period.localeCompare(second.period) || first.complaintType.localeCompare(second.complaintType));
   return { granularity, complaintTypes, rows };
+}
+
+export async function getDescriptorTimeline(filters, options) {
+  if (!filters.complaints.length) return { granularity: "month", descriptors: [], rows: [] };
+  const granularity = daysInRange(filters.startDate, filters.endDate) <= 90 ? "day" : "month";
+  const bucket = granularity === "day" ? "date_trunc_ymd(created_date)" : "date_trunc_ym(created_date)";
+  const results = await querySlices(filters, (slice) => ({
+    select: `${bucket} AS period, descriptor, count(*) AS count`,
+    where: buildWhere(filters, slice, ["descriptor IS NOT NULL"]),
+    group: "period, descriptor",
+    order: "period ASC, descriptor ASC",
+    limit: 50000,
+  }), options);
+  const rows = mergeCounts(
+    results,
+    (row) => `${row.period}\u0000${row.descriptor}`,
+    (key, count) => {
+      const [period, descriptor] = key.split("\u0000");
+      return { period, descriptor, count };
+    },
+  ).sort((first, second) => first.period.localeCompare(second.period) || first.descriptor.localeCompare(second.descriptor));
+  const totals = new Map();
+  rows.forEach((row) => totals.set(row.descriptor, (totals.get(row.descriptor) || 0) + row.count));
+  const descriptors = [...totals.entries()]
+    .sort((first, second) => second[1] - first[1] || first[0].localeCompare(second[0]))
+    .slice(0, 8)
+    .map(([descriptor]) => descriptor);
+  return { granularity, descriptors, rows: rows.filter((row) => descriptors.includes(row.descriptor)) };
 }
 
 export async function getAverageDaysToClose(filters, options) {
@@ -393,6 +460,39 @@ export async function getMonthlyBreakdown(filters, options) {
     .sort((first, second) => first.month - second.month);
 }
 
+export async function getMonthlyComplaintBreakdown(filters, options) {
+  const results = await querySlices(filters, (slice) => ({
+    select: "date_extract_m(created_date) AS month, complaint_type, count(*) AS count",
+    where: buildWhere(filters, slice, ["complaint_type IS NOT NULL"]),
+    group: "month, complaint_type",
+    order: "month ASC, count DESC",
+    limit: 50000,
+  }), options);
+  return mergeCounts(
+    results,
+    (row) => `${row.month}\u0000${row.complaint_type}`,
+    (key, count) => {
+      const [month, complaintType] = key.split("\u0000");
+      return { month: Number(month), complaintType, count };
+    },
+  ).sort((first, second) => first.month - second.month || second.count - first.count || first.complaintType.localeCompare(second.complaintType));
+}
+
+export async function getAgencyStatusBreakdown(filters, options) {
+  const results = await querySlices(filters, (slice) => ({
+    select: "agency, status, count(*) AS count",
+    where: buildWhere(filters, slice, ["agency IS NOT NULL", "status IS NOT NULL"]),
+    group: "agency, status",
+    order: "count DESC",
+    limit: FILTER_OPTION_LIMIT,
+  }), options);
+  return mergeTupleCounts(
+    results,
+    ["agency", "status"],
+    ([agency, status], count) => ({ agency, status, count }),
+  );
+}
+
 function newestFirst(first, second) {
   return String(second.created_date || "").localeCompare(String(first.created_date || ""));
 }
@@ -409,6 +509,49 @@ export async function getMapPoints(filters, options) {
     dataset: slice.dataset.id,
     datasetLabel: slice.dataset.label,
   }))).sort(newestFirst);
+}
+
+export async function getMapHotspots(filters, options) {
+  const results = await querySlices(filters, (slice) => ({
+    select: "latitude, longitude, incident_address, count(*) AS count",
+    where: buildWhere(filters, slice, ["latitude IS NOT NULL", "longitude IS NOT NULL", "incident_address IS NOT NULL"]),
+    group: "latitude, longitude, incident_address",
+    order: "count DESC",
+    limit: RANKING_CANDIDATE_LIMIT,
+  }), options);
+  return {
+    rows: mergeTupleCounts(
+      results,
+      ["latitude", "longitude", "incident_address"],
+      ([latitude, longitude, address], count) => ({ latitude, longitude, address, count }),
+    ).slice(0, HOTSPOT_LIMIT),
+    isCandidateRanking: results.length > 1,
+  };
+}
+
+export async function getHotspotBreakdown(filters, hotspot, options) {
+  const latitude = Number(hotspot.latitude);
+  const longitude = Number(hotspot.longitude);
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || typeof hotspot.address !== "string") {
+    throw new TypeError("Choose a valid hotspot.");
+  }
+  const results = await querySlices(filters, (slice) => ({
+    select: "complaint_type, descriptor, count(*) AS count",
+    where: buildWhere(filters, slice, [
+      `latitude = ${latitude}`,
+      `longitude = ${longitude}`,
+      `incident_address = '${escapeSoqlLiteral(hotspot.address)}'`,
+      "complaint_type IS NOT NULL",
+    ]),
+    group: "complaint_type, descriptor",
+    order: "count DESC",
+    limit: 100,
+  }), options);
+  return mergeTupleCounts(
+    results,
+    ["complaint_type", "descriptor"],
+    ([complaintType, descriptor], count) => ({ complaintType, descriptor: descriptor === "Unknown" ? "" : descriptor, count }),
+  ).slice(0, 10);
 }
 
 export async function getRecentRequests(filters, options) {

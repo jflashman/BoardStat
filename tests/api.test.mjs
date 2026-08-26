@@ -40,6 +40,8 @@ function requestDetails(rawUrl) {
     dataset: url.pathname.split("/").at(-1).replace(".json", ""),
     select: url.searchParams.get("$select"),
     where: url.searchParams.get("$where"),
+    group: url.searchParams.get("$group"),
+    order: url.searchParams.get("$order"),
     limit: url.searchParams.get("$limit"),
   };
 }
@@ -71,6 +73,13 @@ test("production borough routes use their fixed shared dashboard configuration",
     assert.match(html, new RegExp(`<h1 id="page-title">${route.name} 311 dashboard</h1>`));
     assert.match(html, new RegExp(`<strong><u>${route.name}</u></strong>`));
     assert.match(html, /type="module" src="\.\/js\/dashboard\.js(?:\?[^"]+)?"/);
+    assert.match(html, /id="rankings-details"/);
+    assert.match(html, /id="address-analysis"/);
+    assert.match(html, /name="map-mode" value="requests" checked/);
+    assert.match(html, /name="map-mode" value="hotspots"/);
+    assert.match(html, /id="agency-status-details"/);
+    assert.match(html, /name="monthly-mode" value="totals" checked/);
+    assert.match(html, /name="monthly-mode" value="complaints"/);
     assert.doesNotMatch(html, /app\.powerbi\.com/i);
   }
 });
@@ -131,6 +140,89 @@ test("grouped values merge before ranking", async () => {
     { label: "Heat", count: 10 },
   ]);
   assert.ok(calls.every((call) => call.limit === "5000"));
+});
+
+test("worksheet rankings merge complaint pairs and label cross-dataset address candidates", async () => {
+  globalThis.fetch = async (url) => {
+    const { dataset, select } = requestDetails(url);
+    if (select.startsWith("complaint_type, descriptor")) {
+      return jsonResponse(dataset === "76ig-c548"
+        ? [{ complaint_type: "Noise", descriptor: "Loud Music", count: "7" }]
+        : [{ complaint_type: "Noise", descriptor: "Loud Music", count: "8" }, { complaint_type: "Heat", descriptor: "Entire Building", count: "9" }]);
+    }
+    return jsonResponse(dataset === "76ig-c548"
+      ? [{ incident_address: "1 MAIN ST", count: "5" }]
+      : [{ incident_address: "1 MAIN ST", count: "6" }, { incident_address: "2 MAIN ST", count: "8" }]);
+  };
+  const api = await loadApi();
+  const filters = baseFilters({ startDate: "2019-12-30" });
+
+  assert.deepEqual(await api.getComplaintDescriptorBreakdown(filters), [
+    { complaintType: "Noise", descriptor: "Loud Music", count: 15 },
+    { complaintType: "Heat", descriptor: "Entire Building", count: 9 },
+  ]);
+  assert.deepEqual(await api.getAddressBreakdown(filters), {
+    rows: [{ label: "1 MAIN ST", count: 11 }, { label: "2 MAIN ST", count: 8 }],
+    isCandidateRanking: true,
+  });
+});
+
+test("descriptor, agency-status, and monthly complaint aggregates retain their dimensions", async () => {
+  const calls = [];
+  globalThis.fetch = async (url) => {
+    const details = requestDetails(url);
+    calls.push(details);
+    if (details.select.includes("period, descriptor")) {
+      return jsonResponse([
+        { period: "2020-01-01T00:00:00.000", descriptor: "Loud Music", count: "4" },
+        { period: "2020-01-01T00:00:00.000", descriptor: "Banging", count: "2" },
+      ]);
+    }
+    if (details.select.startsWith("agency, status")) {
+      return jsonResponse([{ agency: "NYPD", status: "Closed", count: "6" }]);
+    }
+    return jsonResponse([{ month: "1", complaint_type: "Noise", count: "7" }]);
+  };
+  const api = await loadApi();
+  const filters = baseFilters({ complaints: ["Noise"] });
+
+  assert.deepEqual(await api.getDescriptorTimeline(filters), {
+    granularity: "day",
+    descriptors: ["Loud Music", "Banging"],
+    rows: [
+      { period: "2020-01-01T00:00:00.000", descriptor: "Banging", count: 2 },
+      { period: "2020-01-01T00:00:00.000", descriptor: "Loud Music", count: 4 },
+    ],
+  });
+  assert.deepEqual(await api.getAgencyStatusBreakdown(filters), [{ agency: "NYPD", status: "Closed", count: 6 }]);
+  assert.deepEqual(await api.getMonthlyComplaintBreakdown(filters), [{ month: 1, complaintType: "Noise", count: 7 }]);
+  assert.match(calls.find((call) => call.select.startsWith("agency, status")).group, /agency, status/);
+});
+
+test("hotspots preserve the request map and add bounded aggregate drilldowns", async () => {
+  const calls = [];
+  globalThis.fetch = async (url) => {
+    const details = requestDetails(url);
+    calls.push(details);
+    if (details.select.startsWith("latitude, longitude")) {
+      return jsonResponse([{ latitude: "40.7", longitude: "-74", incident_address: "1 MAIN ST", count: "12" }]);
+    }
+    return jsonResponse([{ complaint_type: "Noise", descriptor: "Loud Music", count: "12" }]);
+  };
+  const api = await loadApi();
+  const filters = baseFilters();
+  const result = await api.getMapHotspots(filters);
+
+  assert.deepEqual(result, {
+    rows: [{ latitude: "40.7", longitude: "-74", address: "1 MAIN ST", count: 12 }],
+    isCandidateRanking: false,
+  });
+  assert.deepEqual(await api.getHotspotBreakdown(filters, result.rows[0]), [
+    { complaintType: "Noise", descriptor: "Loud Music", count: 12 },
+  ]);
+  assert.equal(calls[0].limit, "1000");
+  assert.match(calls[1].where, /latitude = 40\.7/);
+  assert.match(calls[1].where, /incident_address = '1 MAIN ST'/);
 });
 
 test("average closure time is weighted by each dataset's closed count", async () => {
