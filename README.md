@@ -49,6 +49,12 @@ Then open `http://localhost:8000/prototype.html`. Run the dependency-free API re
 node --test tests/api.test.mjs
 ```
 
+### Worksheet workflow parity
+
+The live dashboard preserves its concise default views and loads the more expensive training-workflow analyses only when requested. Optional details include complaint/descriptor and address rankings, address-specific history, status by agency, calendar-month complaint mix, and a hotspot map mode.
+
+The default map remains a newest-first sample of up to 250 request markers per applicable dataset. Hotspot mode instead shows up to 100 high-volume aggregate locations. Rankings that span both NYC Open Data datasets are labeled as leading candidate results because each dataset must be queried independently before the browser merges them; exact totals and low-cardinality aggregate tables are not approximated.
+
 # Change Log
 
 ## BoardStat v0.7 - A New Look

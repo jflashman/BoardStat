@@ -96,6 +96,16 @@ export function renderComplaintChart(rows) {
   renderRankedBar({ canvasId: "complaints-chart", summaryId: "complaints-summary", rows, noun: "complaint types" });
 }
 
+export function renderAddressComplaintChart(rows) {
+  renderRankedBar({
+    canvasId: "address-complaints-chart",
+    summaryId: "address-complaints-summary",
+    rows,
+    noun: "complaint types at the selected addresses",
+    color: palette[4],
+  });
+}
+
 export function renderDescriptorChart(rows) {
   renderRankedBar({ canvasId: "descriptors-chart", summaryId: "descriptors-summary", rows, noun: "descriptors", color: palette[1] });
 }
@@ -149,6 +159,40 @@ export function renderTimelineChart(result) {
     "timeline-summary",
     `${numberFormatter.format(total)} requests shown in ${result.granularity === "day" ? "daily" : "monthly"} intervals.`,
   );
+}
+
+export function renderAddressTimelineChart(result) {
+  if (!result.rows.length) {
+    destroyChart("address-timeline-chart");
+    writeSummary("address-timeline-summary", "No requests were reported over this period for the selected addresses.");
+    return;
+  }
+  replaceChart("address-timeline-chart", {
+    type: "line",
+    data: {
+      labels: result.rows.map((row) => formatPeriod(row.period, result.granularity)),
+      datasets: [{
+        label: "Requests",
+        data: result.rows.map((row) => row.count),
+        borderColor: palette[4],
+        backgroundColor: "rgba(0, 124, 145, 0.12)",
+        borderWidth: 3,
+        pointRadius: result.rows.length > 45 ? 0 : 2,
+        pointHoverRadius: 5,
+        fill: true,
+        tension: 0.2,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 250 },
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+    },
+  });
+  const total = result.rows.reduce((sum, row) => sum + row.count, 0);
+  writeSummary("address-timeline-summary", `${numberFormatter.format(total)} requests across the selected address spellings.`);
 }
 
 export function renderAgencyChart(rows) {
@@ -238,6 +282,75 @@ export function renderComplaintComparisonChart(result) {
   writeSummary("comparison-summary", `Comparing ${result.complaintTypes.join(", ")} over time.`);
 }
 
+export function renderDescriptorTimelineChart(result) {
+  if (!result.rows.length || !result.descriptors.length) {
+    destroyChart("address-descriptors-chart");
+    writeSummary("address-descriptors-summary", "Select at least one complaint type to compare its descriptors over time.");
+    return;
+  }
+  const periods = [...new Set(result.rows.map((row) => row.period))].sort();
+  const datasets = result.descriptors.map((descriptor, index) => {
+    const counts = new Map(result.rows.filter((row) => row.descriptor === descriptor).map((row) => [row.period, row.count]));
+    return {
+      label: descriptor,
+      data: periods.map((period) => counts.get(period) || 0),
+      borderColor: palette[index % palette.length],
+      backgroundColor: palette[index % palette.length],
+      borderWidth: 2,
+      pointRadius: periods.length > 45 ? 0 : 2,
+      tension: 0.18,
+    };
+  });
+  replaceChart("address-descriptors-chart", {
+    type: "line",
+    data: { labels: periods.map((period) => formatPeriod(period, result.granularity)), datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 250 },
+      plugins: { legend: { position: "bottom" } },
+      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
+    },
+  });
+  writeSummary("address-descriptors-summary", `Leading descriptors for the selected complaint filter: ${result.descriptors.join(", ")}.`);
+}
+
+export function renderAgencyStatusChart(rows) {
+  if (!rows.length) {
+    destroyChart("agency-status-chart");
+    writeSummary("agency-status-summary", "No agency and status combinations were reported for this selection.");
+    return;
+  }
+  const totals = new Map();
+  rows.forEach((row) => totals.set(row.agency, (totals.get(row.agency) || 0) + row.count));
+  const agencies = [...totals.entries()]
+    .sort((first, second) => second[1] - first[1] || first[0].localeCompare(second[0]))
+    .slice(0, 10)
+    .map(([agency]) => agency);
+  const statuses = [...new Set(rows.map((row) => row.status))].sort();
+  const values = new Map(rows.map((row) => [`${row.agency}\u0000${row.status}`, row.count]));
+  replaceChart("agency-status-chart", {
+    type: "bar",
+    data: {
+      labels: agencies,
+      datasets: statuses.map((status, index) => ({
+        label: status,
+        data: agencies.map((agency) => values.get(`${agency}\u0000${status}`) || 0),
+        backgroundColor: palette[index % palette.length],
+      })),
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: "y",
+      animation: { duration: 250 },
+      plugins: { legend: { position: "bottom" } },
+      scales: { x: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }, y: { stacked: true } },
+    },
+  });
+  writeSummary("agency-status-summary", `Status composition for the ${agencies.length} leading agencies. Exact values are listed in the table.`);
+}
+
 export function renderAnnualChart(rows) {
   if (!rows.length) {
     destroyChart("annual-chart");
@@ -283,4 +396,57 @@ export function renderMonthlyChart(rows) {
     },
   });
   writeSummary("monthly-summary", "Totals are grouped by calendar month across the selected years and date range.");
+}
+
+export function renderMonthlyComplaintChart(rows, selectedComplaintTypes = []) {
+  if (!rows.length) {
+    destroyChart("monthly-complaints-chart");
+    writeSummary("monthly-complaints-summary", "No monthly complaint mix was reported for this selection.");
+    return { displayedTypes: [], leaders: [] };
+  }
+  const totals = new Map();
+  rows.forEach((row) => totals.set(row.complaintType, (totals.get(row.complaintType) || 0) + row.count));
+  const displayedTypes = selectedComplaintTypes.length
+    ? selectedComplaintTypes.slice(0, 8)
+    : [...totals.entries()]
+      .sort((first, second) => second[1] - first[1] || first[0].localeCompare(second[0]))
+      .slice(0, 8)
+      .map(([complaintType]) => complaintType);
+  const displayed = new Set(displayedTypes);
+  const values = new Map(rows.map((row) => [`${row.month}\u0000${row.complaintType}`, row.count]));
+  const hasOther = rows.some((row) => !displayed.has(row.complaintType));
+  const datasets = displayedTypes.map((complaintType, index) => ({
+    label: complaintType,
+    data: monthNames.map((_, monthIndex) => values.get(`${monthIndex + 1}\u0000${complaintType}`) || 0),
+    backgroundColor: palette[index % palette.length],
+  }));
+  if (hasOther) {
+    datasets.push({
+      label: "Other",
+      data: monthNames.map((_, monthIndex) => rows
+        .filter((row) => row.month === monthIndex + 1 && !displayed.has(row.complaintType))
+        .reduce((sum, row) => sum + row.count, 0)),
+      backgroundColor: "#b8b8b8",
+    });
+  }
+  replaceChart("monthly-complaints-chart", {
+    type: "bar",
+    data: { labels: monthNames, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 250 },
+      plugins: { legend: { position: "bottom" } },
+      scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } },
+    },
+  });
+  const leaders = monthNames.map((monthName, index) => {
+    const candidates = rows.filter((row) => row.month === index + 1).sort((first, second) => second.count - first.count || first.complaintType.localeCompare(second.complaintType));
+    return { month: monthName, complaintType: candidates[0]?.complaintType || "—", count: candidates[0]?.count || 0 };
+  });
+  writeSummary(
+    "monthly-complaints-summary",
+    `${displayedTypes.length} complaint type${displayedTypes.length === 1 ? "" : "s"} shown${hasOther ? " with remaining requests grouped as Other" : ""}. Exact monthly leaders are listed below.`,
+  );
+  return { displayedTypes, leaders };
 }

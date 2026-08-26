@@ -729,6 +729,82 @@ summary:focus-visible,
   grid-column: 1 / -1;
 }
 
+.disclosure-card { padding: 0; }
+
+.disclosure-card > summary {
+  display: flex;
+  min-height: 64px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.15rem 1.35rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.disclosure-card > summary::-webkit-details-marker { display: none; }
+.disclosure-card > summary::after { content: "+"; color: var(--boardstat-action-dark); font-size: 1.6rem; font-weight: 800; }
+.disclosure-card[open] > summary::after { content: "−"; }
+
+.disclosure-card > summary strong {
+  display: block;
+  color: var(--boardstat-ink);
+  font-family: var(--boardstat-font-display);
+  font-size: 1.25rem;
+}
+
+.disclosure-card > :not(summary) { margin-right: 1.35rem; margin-left: 1.35rem; }
+.disclosure-card > :last-child { margin-bottom: 1.35rem; }
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+
+.detail-panel { min-width: 0; }
+.detail-panel h2 { font-size: 1.2rem; }
+
+.mode-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+  margin: 0 0 1rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid var(--boardstat-border);
+  border-radius: 12px;
+  background: var(--boardstat-white);
+}
+
+.mode-control legend {
+  margin: 0;
+  padding: 0 0.35rem;
+  color: var(--boardstat-ink);
+  font-family: var(--boardstat-font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.mode-control label {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0;
+  cursor: pointer;
+}
+
+.compact-action {
+  display: inline-block;
+  min-height: 36px;
+  margin: 0.15rem 0.4rem 0.15rem 0;
+  padding: 0.3rem 0.45rem;
+  white-space: nowrap;
+}
+
+.address-analysis { margin-bottom: 1.25rem; }
+
 .total-card {
   display: flex;
   min-height: 260px;
@@ -835,6 +911,13 @@ summary:focus-visible,
 .map-popup-detail {
   margin: 0.18rem 0;
 }
+
+.hotspot-details ol {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.hotspot-details li + li { margin-top: 0.3rem; }
 
 .request-marker-shell {
   border: 0;
@@ -1075,7 +1158,8 @@ tbody tr:hover {
     grid-template-columns: 1fr;
   }
 
-  .dashboard-grid {
+  .dashboard-grid,
+  .detail-grid {
     grid-template-columns: 1fr;
   }
 

@@ -2,6 +2,7 @@ const DEFAULT_CENTER = [40.7128, -74.006];
 const NYC_BASEMAP_URL = "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/NYC_Basemap_v3/VectorTileServer";
 let map;
 let requestLayer;
+let hotspotLayer;
 let routeCenter = DEFAULT_CENTER;
 let fallbackBasemap;
 
@@ -45,6 +46,7 @@ function initializeMap() {
   map = window.L.map("request-map", { scrollWheelZoom: false, maxZoom: 17 }).setView(routeCenter, 11);
   addBasemap();
   requestLayer = window.L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 45 }).addTo(map);
+  hotspotLayer = window.L.layerGroup().addTo(map);
 }
 
 function createRequestIcon() {
@@ -91,6 +93,7 @@ export function renderMapPoints(points, center = DEFAULT_CENTER) {
   routeCenter = center;
   initializeMap();
   requestLayer.clearLayers();
+  hotspotLayer.clearLayers();
 
   const bounds = [];
   points.forEach((point) => {
@@ -114,6 +117,72 @@ export function renderMapPoints(points, center = DEFAULT_CENTER) {
     map.setView(routeCenter, 11);
   }
 
+  window.setTimeout(() => map.invalidateSize(), 0);
+  return bounds.length;
+}
+
+function createHotspotPopup(hotspot) {
+  const popup = document.createElement("div");
+  addTextLine(popup, hotspot.address || "311 hotspot", "map-popup-title");
+  addTextLine(popup, `${Number(hotspot.count).toLocaleString("en-US")} matching requests`);
+  const details = document.createElement("div");
+  details.className = "hotspot-details";
+  details.textContent = "Open this hotspot to load its leading complaint and descriptor pairs.";
+  popup.append(details);
+  return { popup, details };
+}
+
+export function renderMapHotspots(result, center = DEFAULT_CENTER, loadDetails) {
+  routeCenter = center;
+  initializeMap();
+  requestLayer.clearLayers();
+  hotspotLayer.clearLayers();
+  const bounds = [];
+  const maximum = Math.max(...result.rows.map((row) => Number(row.count) || 0), 1);
+
+  result.rows.forEach((hotspot) => {
+    const latitude = Number(hotspot.latitude);
+    const longitude = Number(hotspot.longitude);
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+    const location = [latitude, longitude];
+    const radius = 8 + (Math.sqrt(Number(hotspot.count) || 0) / Math.sqrt(maximum)) * 20;
+    const { popup, details } = createHotspotPopup(hotspot);
+    let loaded = false;
+    const circle = window.L.circleMarker(location, {
+      radius,
+      color: "#050560",
+      weight: 2,
+      fillColor: "#103fef",
+      fillOpacity: 0.58,
+    }).bindPopup(popup).addTo(hotspotLayer);
+    circle.on("popupopen", async () => {
+      if (loaded || typeof loadDetails !== "function") return;
+      loaded = true;
+      details.textContent = "Loading leading complaint details…";
+      try {
+        const rows = await loadDetails(hotspot);
+        details.replaceChildren();
+        if (!rows.length) {
+          details.textContent = "No complaint details are available for this hotspot.";
+          return;
+        }
+        const list = document.createElement("ol");
+        rows.slice(0, 5).forEach((row) => {
+          const item = document.createElement("li");
+          item.textContent = `${row.complaintType}${row.descriptor ? ` — ${row.descriptor}` : ""}: ${Number(row.count).toLocaleString("en-US")}`;
+          list.append(item);
+        });
+        details.append(list);
+      } catch (error) {
+        loaded = false;
+        details.textContent = error.name === "AbortError" ? "Hotspot details were cancelled." : `Hotspot details could not be loaded. ${error.message}`;
+      }
+    });
+    bounds.push(location);
+  });
+
+  if (bounds.length) map.fitBounds(bounds, { padding: [24, 24], maxZoom: 15 });
+  else map.setView(routeCenter, 11);
   window.setTimeout(() => map.invalidateSize(), 0);
   return bounds.length;
 }

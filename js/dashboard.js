@@ -1,13 +1,20 @@
 import {
   getAgencyBreakdown,
+  getAgencyStatusBreakdown,
   getAnnualBreakdown,
+  getAddressBreakdown,
   getAverageDaysToClose,
   getBoardBreakdown,
   getComplaintTimeline,
+  getComplaintDescriptorBreakdown,
   getDatasetSummary,
   getDescriptorBreakdown,
+  getDescriptorTimeline,
   getFilterOptions,
+  getHotspotBreakdown,
+  getMapHotspots,
   getMapPoints,
+  getMonthlyComplaintBreakdown,
   getMonthlyBreakdown,
   getRecentRequests,
   getStatusBreakdown,
@@ -16,20 +23,25 @@ import {
   getTotalRequests,
   searchAddresses,
   validateFilters,
-} from "./api.js";
+} from "./api.js?v=20260826-3";
 import { BOROUGHS, getBoroughConfig } from "./boroughs.js";
 import {
   renderAgencyChart,
+  renderAgencyStatusChart,
   renderAnnualChart,
+  renderAddressComplaintChart,
+  renderAddressTimelineChart,
   renderBoardChart,
   renderComplaintChart,
   renderComplaintComparisonChart,
   renderDescriptorChart,
+  renderDescriptorTimelineChart,
+  renderMonthlyComplaintChart,
   renderMonthlyChart,
   renderStatusChart,
   renderTimelineChart,
-} from "./charts.js?v=20260826-1";
-import { renderMapPoints } from "./map.js?v=20260826-1";
+} from "./charts.js?v=20260826-3";
+import { renderMapHotspots, renderMapPoints } from "./map.js?v=20260826-3";
 
 const configuredRoute = getBoroughConfig(document.body.dataset.borough);
 const routeParameter = new URLSearchParams(window.location.search).get("borough");
@@ -38,6 +50,8 @@ const ROUTE = (ROUTE_FIXED ? configuredRoute : getBoroughConfig(routeParameter))
 const REFRESH_DELAY = 350;
 const OPTION_REFRESH_DELAY = 650;
 const ADDRESS_SEARCH_DELAY = 350;
+const MAP_MODES = Object.freeze(["requests", "hotspots"]);
+const MONTHLY_MODES = Object.freeze(["totals", "complaints"]);
 const VIEWS = Object.freeze(["filters", "overview", "address", "map", "agency", "trends", "annual", "monthly"]);
 const ARRAY_FILTERS = Object.freeze(["boards", "complaints", "descriptors", "agencies", "statuses", "addresses"]);
 const URL_PARAMETERS = Object.freeze({
@@ -91,6 +105,15 @@ const elements = {
   addressSuggestions: document.getElementById("address-suggestions"),
   selectedAddresses: document.getElementById("selected-addresses"),
   clearAddresses: document.getElementById("clear-addresses"),
+  rankingsDetails: document.getElementById("rankings-details"),
+  pairsBody: document.getElementById("complaint-pairs-body"),
+  addressRankingBody: document.getElementById("address-ranking-body"),
+  addressAnalysis: document.getElementById("address-analysis"),
+  addressAnalysisGuidance: document.getElementById("address-analysis-guidance"),
+  agencyStatusDetails: document.getElementById("agency-status-details"),
+  agencyStatusHead: document.getElementById("agency-status-head"),
+  agencyStatusBody: document.getElementById("agency-status-body"),
+  monthlyLeadersBody: document.getElementById("monthly-leaders-body"),
   sharedFilterPanel: document.getElementById("shared-filter-panel"),
   boroughRoute: document.getElementById("borough-route"),
   pageTitle: document.getElementById("page-title"),
@@ -128,6 +151,8 @@ function getDefaultState() {
     startDate: toInputDate(start),
     endDate: toInputDate(end),
     view: "overview",
+    mapMode: "requests",
+    monthlyMode: "totals",
   };
 }
 
@@ -156,6 +181,8 @@ function parseUrlState() {
     startDate: parameters.get("start") || defaults.startDate,
     endDate: parameters.get("end") || defaults.endDate,
     view: VIEWS.includes(parameters.get("view")) ? parameters.get("view") : defaults.view,
+    mapMode: MAP_MODES.includes(parameters.get("map_mode")) ? parameters.get("map_mode") : defaults.mapMode,
+    monthlyMode: MONTHLY_MODES.includes(parameters.get("monthly_mode")) ? parameters.get("monthly_mode") : defaults.monthlyMode,
   };
 
   try {
@@ -190,6 +217,8 @@ function writeUrl({ push = false } = {}) {
   parameters.set("start", state.startDate);
   parameters.set("end", state.endDate);
   parameters.set("view", state.view);
+  if (state.mapMode !== "requests") parameters.set("map_mode", state.mapMode);
+  if (state.monthlyMode !== "totals") parameters.set("monthly_mode", state.monthlyMode);
   const url = `${window.location.pathname}?${parameters.toString()}`;
   window.history[push ? "pushState" : "replaceState"]({}, "", url);
 }
@@ -284,6 +313,14 @@ function syncFormFromState() {
   elements.startDate.max = today;
   elements.endDate.max = today;
   renderAllFilterOptions();
+  document.querySelectorAll('input[name="map-mode"]').forEach((input) => { input.checked = input.value === state.mapMode; });
+  document.querySelectorAll('input[name="monthly-mode"]').forEach((input) => { input.checked = input.value === state.monthlyMode; });
+  document.getElementById("monthly-panel")?.toggleAttribute("hidden", state.monthlyMode !== "totals");
+  document.getElementById("monthly-complaints-panel")?.toggleAttribute("hidden", state.monthlyMode !== "complaints");
+  const mapEyebrow = document.getElementById("map-eyebrow");
+  const mapHeading = document.getElementById("map-heading");
+  if (mapEyebrow) mapEyebrow.textContent = state.mapMode === "hotspots" ? "Highest-volume matching locations" : "Newest geocoded requests";
+  if (mapHeading) mapHeading.textContent = state.mapMode === "hotspots" ? "Request hotspots" : "Request map";
 }
 
 function selectionSummaryItems() {
@@ -468,22 +505,198 @@ function renderRecentRequests(rows) {
   elements.recentBody.append(fragment);
 }
 
+function renderComplaintPairs(rows) {
+  elements.pairsBody.replaceChildren();
+  const fragment = document.createDocumentFragment();
+  rows.forEach((item) => {
+    const row = document.createElement("tr");
+    [item.complaintType, item.descriptor, numberFormatter.format(item.count)].forEach((value) => {
+      const cell = document.createElement("td");
+      cell.textContent = value;
+      row.append(cell);
+    });
+    const actionCell = document.createElement("td");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "text-button compact-action";
+    button.dataset.useComplaint = item.complaintType;
+    button.dataset.useDescriptor = item.descriptor;
+    button.textContent = "Use as filters";
+    actionCell.append(button);
+    row.append(actionCell);
+    fragment.append(row);
+  });
+  if (!rows.length) {
+    const row = document.createElement("tr");
+    row.className = "empty-row";
+    const cell = document.createElement("td");
+    cell.colSpan = 4;
+    cell.textContent = "No complaint and descriptor pairs match these filters.";
+    row.append(cell);
+    fragment.append(row);
+  }
+  elements.pairsBody.replaceChildren(fragment);
+}
+
+function renderAddressRanking(result) {
+  elements.addressRankingBody.replaceChildren();
+  const fragment = document.createDocumentFragment();
+  result.rows.forEach((item) => {
+    const row = document.createElement("tr");
+    [item.label, numberFormatter.format(item.count)].forEach((value) => {
+      const cell = document.createElement("td");
+      cell.textContent = value;
+      row.append(cell);
+    });
+    const actionCell = document.createElement("td");
+    const addButton = document.createElement("button");
+    addButton.type = "button";
+    addButton.className = "text-button compact-action";
+    addButton.dataset.addRankedAddress = item.label;
+    addButton.textContent = "Add address";
+    const viewButton = document.createElement("button");
+    viewButton.type = "button";
+    viewButton.className = "text-button compact-action";
+    viewButton.dataset.viewRankedAddress = item.label;
+    viewButton.textContent = "View address";
+    actionCell.append(addButton, viewButton);
+    row.append(actionCell);
+    fragment.append(row);
+  });
+  if (!result.rows.length) {
+    const row = document.createElement("tr");
+    row.className = "empty-row";
+    const cell = document.createElement("td");
+    cell.colSpan = 3;
+    cell.textContent = "No incident addresses match these filters.";
+    row.append(cell);
+    fragment.append(row);
+  }
+  elements.addressRankingBody.replaceChildren(fragment);
+  document.getElementById("address-ranking-note").textContent = result.isCandidateRanking
+    ? "Leading addresses merged from bounded historical and current dataset candidates; this is not guaranteed to be an exhaustive cross-dataset ranking."
+    : "Top addresses for the applicable dataset and current filters.";
+}
+
+function renderAgencyStatusTable(rows) {
+  const totals = new Map();
+  rows.forEach((row) => totals.set(row.agency, (totals.get(row.agency) || 0) + row.count));
+  const agencies = [...totals.entries()]
+    .sort((first, second) => second[1] - first[1] || first[0].localeCompare(second[0]))
+    .slice(0, 10)
+    .map(([agency]) => agency);
+  const statuses = [...new Set(rows.map((row) => row.status))].sort();
+  const counts = new Map(rows.map((row) => [`${row.agency}\u0000${row.status}`, row.count]));
+  const headRow = document.createElement("tr");
+  ["Agency", ...statuses, "Total"].forEach((label) => {
+    const cell = document.createElement("th");
+    cell.scope = "col";
+    cell.textContent = label;
+    headRow.append(cell);
+  });
+  elements.agencyStatusHead.replaceChildren(headRow);
+  const fragment = document.createDocumentFragment();
+  agencies.forEach((agency) => {
+    const row = document.createElement("tr");
+    const heading = document.createElement("th");
+    heading.scope = "row";
+    heading.textContent = agency;
+    row.append(heading);
+    statuses.forEach((status) => {
+      const cell = document.createElement("td");
+      cell.textContent = numberFormatter.format(counts.get(`${agency}\u0000${status}`) || 0);
+      row.append(cell);
+    });
+    const total = document.createElement("td");
+    total.textContent = numberFormatter.format(totals.get(agency));
+    row.append(total);
+    fragment.append(row);
+  });
+  if (!agencies.length) {
+    const row = document.createElement("tr");
+    const cell = document.createElement("td");
+    cell.colSpan = Math.max(statuses.length + 2, 2);
+    cell.textContent = "No agency and status combinations match these filters.";
+    row.append(cell);
+    fragment.append(row);
+  }
+  elements.agencyStatusBody.replaceChildren(fragment);
+  renderAgencyStatusChart(rows);
+}
+
+function renderMonthlyComplaintMix(rows) {
+  const { leaders } = renderMonthlyComplaintChart(rows, state.complaints);
+  const fragment = document.createDocumentFragment();
+  leaders.forEach((leader) => {
+    const row = document.createElement("tr");
+    [leader.month, leader.complaintType, numberFormatter.format(leader.count)].forEach((value) => {
+      const cell = document.createElement("td");
+      cell.textContent = value;
+      row.append(cell);
+    });
+    fragment.append(row);
+  });
+  elements.monthlyLeadersBody.replaceChildren(fragment);
+}
+
 function renderAverageDays(value) {
   elements.averageDays.textContent = value === null ? "—" : `${value.toFixed(1)} days`;
 }
 
+function updateAddressAnalysisVisibility(hasAddresses) {
+  elements.addressAnalysis.hidden = !hasAddresses;
+  elements.addressAnalysisGuidance.hidden = hasAddresses;
+}
+
 function viewTasks(filters, options) {
   switch (state.view) {
-    case "overview":
-      return [
+    case "overview": {
+      const tasks = [
         loadPanel("total-panel", () => getTotalRequests(filters, options), (value) => { elements.total.textContent = numberFormatter.format(value); }),
         loadPanel("boards-panel", () => getBoardBreakdown(filters, options), renderBoardChart, "No board totals match these filters."),
         loadPanel("complaints-panel", () => getTopComplaintTypes(filters, options), renderComplaintChart, "No complaint types match these filters."),
         loadPanel("descriptors-panel", () => getDescriptorBreakdown(filters, options), renderDescriptorChart, "No descriptors match these filters."),
       ];
-    case "address":
-      return [loadPanel("address-results-panel", () => getRecentRequests(filters, options), renderRecentRequests, "No requests match these filters.")];
+      if (elements.rankingsDetails.open) {
+        tasks.push(
+          loadPanel("complaint-pairs-panel", () => getComplaintDescriptorBreakdown(filters, options), renderComplaintPairs, "No complaint and descriptor pairs match these filters."),
+          loadPanel("address-ranking-panel", () => getAddressBreakdown(filters, options), renderAddressRanking, "No incident addresses match these filters."),
+        );
+      }
+      return tasks;
+    }
+    case "address": {
+      const tasks = [loadPanel("address-results-panel", () => getRecentRequests(filters, options), renderRecentRequests, "No requests match these filters.")];
+      updateAddressAnalysisVisibility(Boolean(filters.addresses.length));
+      if (filters.addresses.length) {
+        tasks.push(
+          loadPanel("address-timeline-panel", () => getTimeline(filters, options), renderAddressTimelineChart, "No requests match this period for the selected addresses."),
+          loadPanel("address-complaints-panel", () => getTopComplaintTypes(filters, options), renderAddressComplaintChart, "No complaint types match the selected addresses."),
+        );
+        if (filters.complaints.length) {
+          tasks.push(loadPanel("address-descriptors-panel", () => getDescriptorTimeline(filters, options), renderDescriptorTimelineChart, "No descriptor timeline matches these filters."));
+        } else {
+          renderDescriptorTimelineChart({ descriptors: [], rows: [] });
+          setPanelReady("address-descriptors-panel", "Choose a complaint type in Shared filters to load descriptor trends.");
+        }
+      }
+      return tasks;
+    }
     case "map":
+      if (state.mapMode === "hotspots") {
+        return [loadPanel(
+          "map-panel",
+          () => getMapHotspots(filters, options),
+          (result) => {
+            const count = renderMapHotspots(result, ROUTE.center, (hotspot) => getHotspotBreakdown(filters, hotspot, options));
+            const note = result.isCandidateRanking
+              ? `${numberFormatter.format(count)} leading locations from bounded historical and current candidates; not an exhaustive cross-dataset ranking`
+              : `${numberFormatter.format(count)} highest-volume matching locations`;
+            document.getElementById("map-limit-note").textContent = note;
+          },
+          "No geocoded hotspots match these filters.",
+        )];
+      }
       return [loadPanel(
         "map-panel",
         () => getMapPoints(filters, options),
@@ -499,12 +712,17 @@ function viewTasks(filters, options) {
         },
         "No geocoded requests match these filters.",
       )];
-    case "agency":
-      return [
+    case "agency": {
+      const tasks = [
         loadPanel("average-panel", () => getAverageDaysToClose(filters, options), renderAverageDays, "No closed requests match these filters."),
         loadPanel("agencies-panel", () => getAgencyBreakdown(filters, options), renderAgencyChart, "No agencies match these filters."),
         loadPanel("statuses-panel", () => getStatusBreakdown(filters, options), renderStatusChart, "No statuses match these filters."),
       ];
+      if (elements.agencyStatusDetails.open) {
+        tasks.push(loadPanel("agency-status-details", () => getAgencyStatusBreakdown(filters, options), renderAgencyStatusTable, "No agency and status combinations match these filters."));
+      }
+      return tasks;
+    }
     case "trends":
       return [
         loadPanel("timeline-panel", () => getTimeline(filters, options), renderTimelineChart, "No requests match this period."),
@@ -526,7 +744,9 @@ function viewTasks(filters, options) {
     case "annual":
       return [loadPanel("annual-panel", () => getAnnualBreakdown(filters, options), renderAnnualChart, "No annual totals match these filters.")];
     case "monthly":
-      return [loadPanel("monthly-panel", () => getMonthlyBreakdown(filters, options), renderMonthlyChart, "No monthly totals match these filters.")];
+      return state.monthlyMode === "complaints"
+        ? [loadPanel("monthly-complaints-panel", () => getMonthlyComplaintBreakdown(filters, options), renderMonthlyComplaintMix, "No monthly complaint mix matches these filters.")]
+        : [loadPanel("monthly-panel", () => getMonthlyBreakdown(filters, options), renderMonthlyChart, "No monthly totals match these filters.")];
     default:
       return [];
   }
@@ -596,7 +816,7 @@ function scheduleOptionRefresh() {
   optionRefreshTimer = window.setTimeout(refreshFilterOptions, OPTION_REFRESH_DELAY);
 }
 
-function handleFilterStateChange() {
+function handleFilterStateChange({ push = false } = {}) {
   renderStateSummary();
   renderSelectedAddresses();
   const message = getValidationMessage();
@@ -610,7 +830,7 @@ function handleFilterStateChange() {
     elements.retry.disabled = false;
     return;
   }
-  writeUrl();
+  writeUrl({ push });
   scheduleViewRefresh();
   scheduleOptionRefresh();
 }
@@ -671,17 +891,18 @@ async function runAddressSearch() {
   }
 }
 
-function addAddress(address) {
-  if (state.addresses.includes(address)) return;
+function addAddress(address, { push = false } = {}) {
+  if (state.addresses.includes(address)) return true;
   if (state.addresses.length >= 10) {
     elements.addressSearchStatus.textContent = "Remove an address before selecting another; the limit is 10.";
-    return;
+    return false;
   }
   state.addresses = [...state.addresses, address];
   elements.addressSearch.value = "";
   elements.addressSuggestions.replaceChildren();
   elements.addressSearchStatus.textContent = `${address} added to the shared filters.`;
-  handleFilterStateChange();
+  handleFilterStateChange({ push });
+  return true;
 }
 
 elements.form.addEventListener("change", () => {
@@ -709,6 +930,27 @@ document.addEventListener("click", (event) => {
     return;
   }
 
+  const pair = event.target.closest("[data-use-complaint]");
+  if (pair) {
+    state.complaints = [pair.dataset.useComplaint];
+    state.descriptors = [pair.dataset.useDescriptor];
+    syncFormFromState();
+    handleFilterStateChange({ push: true });
+    return;
+  }
+
+  const rankedAddress = event.target.closest("[data-add-ranked-address]");
+  if (rankedAddress) {
+    addAddress(rankedAddress.dataset.addRankedAddress, { push: true });
+    return;
+  }
+
+  const viewedAddress = event.target.closest("[data-view-ranked-address]");
+  if (viewedAddress) {
+    if (addAddress(viewedAddress.dataset.viewRankedAddress, { push: true })) setActiveView("address");
+    return;
+  }
+
   const removeAddress = event.target.closest("[data-remove-address]");
   if (removeAddress) {
     state.addresses = state.addresses.filter((address) => address !== removeAddress.dataset.removeAddress);
@@ -720,6 +962,8 @@ elements.reset.addEventListener("click", () => {
   window.clearTimeout(refreshTimer);
   window.clearTimeout(optionRefreshTimer);
   state = getDefaultState();
+  elements.rankingsDetails.open = false;
+  elements.agencyStatusDetails.open = false;
   lastFilterOptions = { complaints: [], descriptors: [], agencies: [], statuses: [] };
   syncFormFromState();
   renderSelectedAddresses();
@@ -746,6 +990,34 @@ elements.addressSearch.addEventListener("input", () => {
 
 elements.sharedFilterPanel.addEventListener("toggle", () => {
   if (elements.sharedFilterPanel.open) refreshFilterOptions();
+});
+
+elements.rankingsDetails.addEventListener("toggle", () => {
+  if (elements.rankingsDetails.open && state.view === "overview") refreshCurrentView();
+});
+
+elements.agencyStatusDetails.addEventListener("toggle", () => {
+  if (elements.agencyStatusDetails.open && state.view === "agency") refreshCurrentView();
+});
+
+document.querySelectorAll('input[name="map-mode"]').forEach((input) => {
+  input.addEventListener("change", () => {
+    if (!input.checked) return;
+    state.mapMode = input.value;
+    syncFormFromState();
+    writeUrl({ push: true });
+    refreshCurrentView();
+  });
+});
+
+document.querySelectorAll('input[name="monthly-mode"]').forEach((input) => {
+  input.addEventListener("change", () => {
+    if (!input.checked) return;
+    state.monthlyMode = input.value;
+    syncFormFromState();
+    writeUrl({ push: true });
+    refreshCurrentView();
+  });
 });
 
 document.querySelectorAll("[data-view]").forEach((button) => {
