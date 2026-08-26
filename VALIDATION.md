@@ -58,6 +58,10 @@ Observed anonymous-API route timings varied with Socrata and browser cache state
 - Totals must match the official API, including date-boundary splitting and route-borough isolation.
 - High-cardinality cross-dataset address and hotspot results must remain labeled as candidate rankings.
 
+## Pull-request automation
+
+The draft introduces the repository's first GitHub Actions workflow. No check run was reported immediately after opening the fork-based draft PR; an upstream maintainer may need to authorize workflows from the contributor before CI evidence appears. Until then, the passing local commands above are reproducible evidence, not a substitute for an upstream check.
+
 ## AI-use record
 
 OpenAI Codex assisted with repository analysis, code and test drafting, debugging, documentation, and automated browser checks. Only public repository content, public documentation, and public NYC 311 data were used. AI is not part of the deployed application or its data pipeline. The human contributor and reviewers remain accountable for deciding whether the contribution is accurate and suitable for publication.
