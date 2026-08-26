@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test, { afterEach } from "node:test";
 
 import { BOROUGHS } from "../js/boroughs.js";
@@ -60,6 +61,18 @@ test("borough configuration contains unique scoped options and no global unspeci
   assert.ok(BOROUGHS.bronx.boards.includes("01 QUEENS"));
   assert.ok(BOROUGHS.queens.boards.includes("QENB"));
   assert.ok(BOROUGHS.statenisland.boards.includes("SILC"));
+});
+
+test("production borough routes use their fixed shared dashboard configuration", async () => {
+  for (const route of Object.values(BOROUGHS)) {
+    const html = await readFile(new URL(`../${route.slug}.html`, import.meta.url), "utf8");
+    assert.match(html, new RegExp(`<title>BoardStat ${route.name}</title>`));
+    assert.match(html, new RegExp(`<body data-borough="${route.slug}" data-default-boards="all" data-route-fixed="true">`));
+    assert.match(html, new RegExp(`<h1 id="page-title">${route.name} 311 dashboard</h1>`));
+    assert.match(html, new RegExp(`<strong><u>${route.name}</u></strong>`));
+    assert.match(html, /type="module" src="\.\/js\/dashboard\.js"/);
+    assert.doesNotMatch(html, /app\.powerbi\.com/i);
+  }
 });
 
 test("boundary ranges split at 2020 and merge only complete totals", async () => {
@@ -173,17 +186,29 @@ test("SoQL string filters escape apostrophes", async () => {
   assert.match(capturedWhere, /complaint_type IN \('O''Brien'\)/);
 });
 
-test("permitted anomaly boards remain constrained to the route borough", async () => {
-  let capturedWhere = "";
+test("permitted special and anomaly boards remain constrained to their route borough", async () => {
+  const capturedWheres = [];
   globalThis.fetch = async (url) => {
-    capturedWhere = requestDetails(url).where;
+    capturedWheres.push(requestDetails(url).where);
     return jsonResponse([{ count: "1" }]);
   };
   const api = await loadApi();
+  const routes = [
+    { borough: "bronx", board: "01 QUEENS", datasetValue: "BRONX" },
+    { borough: "brooklyn", board: "55 BROOKLYN", datasetValue: "BROOKLYN" },
+    { borough: "manhattan", board: "08 BRONX", datasetValue: "MANHATTAN" },
+    { borough: "queens", board: "QENB", datasetValue: "QUEENS" },
+    { borough: "statenisland", board: "SILC", datasetValue: "STATEN ISLAND" },
+  ];
 
-  await api.getTotalRequests(baseFilters({ boards: ["08 BRONX"] }));
-  assert.match(capturedWhere, /borough = 'MANHATTAN'/);
-  assert.match(capturedWhere, /community_board IN \('08 BRONX'\)/);
+  for (const route of routes) {
+    await api.getTotalRequests(baseFilters({ borough: route.borough, boards: [route.board] }));
+  }
+
+  routes.forEach((route, index) => {
+    assert.match(capturedWheres[index], new RegExp(`borough = '${route.datasetValue}'`));
+    assert.match(capturedWheres[index], new RegExp(`community_board IN \\('${route.board}'\\)`));
+  });
 });
 
 test("a dataset failure aborts its sibling and rejects the combined result", async () => {
