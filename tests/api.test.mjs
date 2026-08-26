@@ -173,6 +173,19 @@ test("SoQL string filters escape apostrophes", async () => {
   assert.match(capturedWhere, /complaint_type IN \('O''Brien'\)/);
 });
 
+test("permitted anomaly boards remain constrained to the route borough", async () => {
+  let capturedWhere = "";
+  globalThis.fetch = async (url) => {
+    capturedWhere = requestDetails(url).where;
+    return jsonResponse([{ count: "1" }]);
+  };
+  const api = await loadApi();
+
+  await api.getTotalRequests(baseFilters({ boards: ["08 BRONX"] }));
+  assert.match(capturedWhere, /borough = 'MANHATTAN'/);
+  assert.match(capturedWhere, /community_board IN \('08 BRONX'\)/);
+});
+
 test("a dataset failure aborts its sibling and rejects the combined result", async () => {
   let currentAborted = false;
   globalThis.fetch = async (url, { signal }) => {
