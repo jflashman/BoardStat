@@ -31,8 +31,10 @@ import {
 } from "./charts.js";
 import { renderMapPoints } from "./map.js";
 
+const configuredRoute = getBoroughConfig(document.body.dataset.borough);
 const routeParameter = new URLSearchParams(window.location.search).get("borough");
-const ROUTE = getBoroughConfig(routeParameter) || getBoroughConfig(document.body.dataset.borough) || BOROUGHS.manhattan;
+const ROUTE_FIXED = document.body.dataset.routeFixed === "true";
+const ROUTE = (ROUTE_FIXED ? configuredRoute : getBoroughConfig(routeParameter)) || configuredRoute || BOROUGHS.manhattan;
 const REFRESH_DELAY = 350;
 const OPTION_REFRESH_DELAY = 650;
 const ADDRESS_SEARCH_DELAY = 350;
@@ -181,7 +183,7 @@ function toApiFilters(source = state) {
 
 function writeUrl({ push = false } = {}) {
   const parameters = new URLSearchParams();
-  if (ROUTE !== BOROUGHS.manhattan) parameters.set("borough", ROUTE.slug);
+  if (!ROUTE_FIXED && ROUTE !== BOROUGHS.manhattan) parameters.set("borough", ROUTE.slug);
   Object.entries(URL_PARAMETERS).forEach(([stateKey, parameter]) => {
     state[stateKey].forEach((value) => parameters.append(parameter, String(value)));
   });
@@ -761,17 +763,19 @@ document.querySelectorAll("[data-view]").forEach((button) => {
   });
 });
 
-elements.boroughRoute.value = ROUTE.slug;
 elements.pageTitle.textContent = `${ROUTE.name} 311 dashboard`;
-document.title = `BoardStat ${ROUTE.name} Historical Prototype`;
-elements.boroughRoute.addEventListener("change", () => {
-  const nextRoute = getBoroughConfig(elements.boroughRoute.value);
-  if (!nextRoute || nextRoute === ROUTE) return;
-  const url = new URL(window.location.href);
-  url.search = "";
-  if (nextRoute !== BOROUGHS.manhattan) url.searchParams.set("borough", nextRoute.slug);
-  window.location.assign(url);
-});
+if (!ROUTE_FIXED) document.title = `BoardStat ${ROUTE.name} Historical Prototype`;
+if (elements.boroughRoute) {
+  elements.boroughRoute.value = ROUTE.slug;
+  elements.boroughRoute.addEventListener("change", () => {
+    const nextRoute = getBoroughConfig(elements.boroughRoute.value);
+    if (!nextRoute || nextRoute === ROUTE) return;
+    const url = new URL(window.location.href);
+    url.search = "";
+    if (nextRoute !== BOROUGHS.manhattan) url.searchParams.set("borough", nextRoute.slug);
+    window.location.assign(url);
+  });
+}
 
 window.addEventListener("popstate", () => {
   state = parseUrlState();
