@@ -1,8 +1,8 @@
 # BoardStat
-## As of 2026, Boardstat's 311 data can no longer be refreshed. BetaNYC is working to deliver a new version of Boardstat in 2026.
-BoardStat is an interactive tool for New York City’s community boards. It empowers users to discover issues and trends within district boundaries. The six pages of the tool provide a variety of summaries, graphs, and maps of 311 data (from 2010 through the present day). Not only does BoardStat empower community board staff and members to gain timely insights into their residents’ concerns, but it also furthers Manhattan Borough President Gale A. Brewer's goal of moving beyond open data access to meaningful open data use.
 
-This github repo is to document issues and outline future features.
+BoardStat is an interactive tool for New York City’s community boards. Its browser-native borough dashboards query live NYC Open Data and provide synchronized summaries, charts, maps, and tables for 311 service requests from 2010 to the present. BoardStat empowers community board staff and members to discover issues and trends within district boundaries while moving beyond open-data access to meaningful use.
+
+This repository contains the static GitHub Pages application, its data-access modules, and dependency-free regression tests.
 
 **IF you are looking for tutorals on how to use BoardStat's features, please check out our indepth page-by-page [videos on BetaNYC's YouTube](https://youtu.be/Q8JJfaizWik).**
 
@@ -32,8 +32,45 @@ In the meantime, you can browse our training materials.
  * [BoardStat Training - Data Journey Worksheet](https://docs.google.com/document/d/1DHgVLrm-X1gs1rwovhpWA5En_ozcQnTWHYobmG9_B0A/edit) - This is the worksheet BetaNYC uses to teach BoardStat. You can find companion slides [here](http://bit.ly/betanyc_datajourney_manhattan).
  * [Training Videos](https://) - In development
  
-## Data
-BoardStat is ingesting [NYC 311 Service Requests from 2010 to Present](https://data.cityofnewyork.us/Social-Services/311-Service-Requests-from-2010-to-Present/erm2-nwe9) dataset directly from the city’s open data portal. Data is filtered by the Community Board column.
+## Data and methodology
+
+The borough dashboards query NYC Open Data's [2010–2019](https://data.cityofnewyork.us/Social-Services/311-Service-Requests-from-2010-to-2019/76ig-c548/about_data) and [2020–present](https://data.cityofnewyork.us/Social-Services/311-Service-Requests-from-2020-to-Present/erm2-nwe9/about_data) 311 datasets directly from the browser. Queries always constrain both the route borough and its permitted Community Board values. Date ranges crossing January 1, 2020 are split between the two datasets and compatible aggregate results are merged in the browser.
+
+Aggregation is pushed to Socrata with SoQL. The raw-request table and default map use bounded newest-first samples rather than downloading every matching record. High-cardinality rankings that span both datasets are explicitly labeled as leading candidates because each dataset must be ranked before its candidates can be merged. Exact totals and low-cardinality aggregates are not approximated.
+
+## Development
+
+Serve the repository without a build step:
+
+```bash
+python3 -m http.server 8000
+```
+
+Then open `http://localhost:8000/prototype.html` or a borough route. Run all dependency-free regression checks with:
+
+```bash
+node --test tests/*.test.mjs
+```
+
+Run the optional live validation against NYC Open Data with `node tests/live-api-validation.mjs`. It is intentionally excluded from CI because it depends on an external public service.
+
+### Worksheet workflow parity
+
+The live dashboard preserves its concise default views and loads the more expensive training-workflow analyses only when requested. Optional details include complaint/descriptor and address rankings, address-specific history, status by agency, calendar-month complaint mix, and a hotspot map mode.
+
+The default map remains a newest-first sample of up to 250 request markers per applicable dataset. Hotspot mode instead shows up to 100 high-volume aggregate locations. Rankings that span both NYC Open Data datasets are labeled as leading candidate results because each dataset must be queried independently before the browser merges them; exact totals and low-cardinality aggregate tables are not approximated.
+
+## Third-party software and services
+
+BoardStat loads pinned releases of Chart.js, Leaflet, Leaflet.markercluster, Esri Leaflet, and Esri Leaflet Vector from public CDNs. Static CDN assets include Subresource Integrity metadata. Map tiles are provided by Esri and OpenStreetMap contributors with visible attribution. The original production analytics, jQuery, Popper, Bootstrap, Font Awesome, and NYC theme dependencies are preserved. See `THIRD_PARTY_NOTICES.md` for versions and licenses; self-hosted fonts and their SIL Open Font License are documented in `fonts/README.md`.
+
+## AI assistance and human verification
+
+Generative AI tools, including OpenAI Codex, assisted with repository analysis, code and test drafting, debugging, and documentation for the browser-native migration. AI is not used at runtime and does not generate, classify, summarize, or alter the displayed 311 records or statistics; results are produced deterministically from Socrata queries.
+
+**Human verification status:** in progress. The draft contribution will not be represented as ready for production until a named human reviewer has inspected the implementation and validation evidence and accepted responsibility for the submission.
+
+The review record is retained in `VALIDATION.md`. This disclosure follows [BetaNYC's AI Policy](https://beta.nyc/about/ai-policy), including its transparency, methodology-documentation, source-verification, and human-review principles. Only public repository content, public documentation, and public NYC 311 data were used during AI-assisted work.
 
 # Change Log
 
