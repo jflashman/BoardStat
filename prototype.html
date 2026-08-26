@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" crossorigin="anonymous" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" crossorigin="anonymous" />
-    <link rel="stylesheet" href="./css/prototype.css" />
+    <link rel="stylesheet" href="./css/prototype.css?v=20260826-1" />
   </head>
   <body data-borough="manhattan">
     <a class="skip-link" href="#dashboard">Skip to dashboard</a>
@@ -50,7 +50,7 @@
     <main id="dashboard" class="prototype-container dashboard-shell">
       <section class="hero" aria-labelledby="page-title">
         <div>
-          <p class="eyebrow">Milestone 4 hardening prototype</p>
+          <p class="eyebrow">Live NYC 311 data</p>
           <h1 id="page-title">Manhattan 311 dashboard</h1>
           <p class="hero-copy">Explore service requests from 2010 to the present across synchronized BoardStat views using live NYC Open Data.</p>
         </div>
@@ -72,7 +72,7 @@
       </section>
 
       <aside class="prototype-notice" aria-label="Prototype notice">
-        <strong>Experimental:</strong> browser-native BoardStat prototype using live NYC Open Data. Existing BoardStat production pages are unchanged.
+        <strong>Experimental:</strong> preview the shared browser-native BoardStat dashboard across all five borough configurations using live NYC Open Data.
       </aside>
 
       <nav class="view-nav" aria-label="Dashboard views" aria-orientation="horizontal" role="tablist">
@@ -289,6 +289,8 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
     <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" crossorigin="anonymous"></script>
-    <script type="module" src="./js/dashboard.js"></script>
+    <script src="https://unpkg.com/esri-leaflet@3.0.19/dist/esri-leaflet.js" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/esri-leaflet-vector@4.3.0/dist/esri-leaflet-vector.js" crossorigin="anonymous"></script>
+    <script type="module" src="./js/dashboard.js?v=20260826-1"></script>
   </body>
 </html>

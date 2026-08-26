@@ -1,21 +1,49 @@
 const DEFAULT_CENTER = [40.7128, -74.006];
+const NYC_BASEMAP_URL = "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/rest/services/NYC_Basemap_v3/VectorTileServer";
 let map;
 let requestLayer;
 let routeCenter = DEFAULT_CENTER;
+let fallbackBasemap;
 
 function requireLeaflet() {
   if (!window.L) throw new Error("Leaflet did not load.");
   if (!window.L.markerClusterGroup) throw new Error("Leaflet marker clustering did not load.");
 }
 
-function initializeMap() {
-  if (map) return;
-  requireLeaflet();
-  map = window.L.map("request-map", { scrollWheelZoom: false }).setView(routeCenter, 11);
-  window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+function addOpenStreetMapFallback() {
+  if (fallbackBasemap) return fallbackBasemap;
+  fallbackBasemap = window.L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
   }).addTo(map);
+  return fallbackBasemap;
+}
+
+function addBasemap() {
+  const vectorTiles = window.L.esri?.Vector?.vectorTileLayer;
+  if (!vectorTiles) return addOpenStreetMapFallback();
+
+  const layer = vectorTiles(NYC_BASEMAP_URL, {
+    attribution: 'Basemap &copy; <a href="https://www.nyc.gov/site/oti/index.page">NYC OTI</a>',
+  });
+  let loaded = false;
+  layer.on("load", () => {
+    loaded = true;
+  });
+  layer.on("load-error", () => {
+    if (loaded || fallbackBasemap) return;
+    map.removeLayer(layer);
+    addOpenStreetMapFallback();
+  });
+  layer.addTo(map);
+  return layer;
+}
+
+function initializeMap() {
+  if (map) return;
+  requireLeaflet();
+  map = window.L.map("request-map", { scrollWheelZoom: false, maxZoom: 17 }).setView(routeCenter, 11);
+  addBasemap();
   requestLayer = window.L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 45 }).addTo(map);
 }
 
@@ -23,8 +51,8 @@ function createRequestIcon() {
   return window.L.divIcon({
     className: "request-marker-shell",
     html: '<span class="request-marker-dot" aria-hidden="true"></span>',
-    iconSize: [14, 14],
-    iconAnchor: [7, 7],
+    iconSize: [28, 28],
+    iconAnchor: [14, 14],
   });
 }
 

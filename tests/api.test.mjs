@@ -70,7 +70,7 @@ test("production borough routes use their fixed shared dashboard configuration",
     assert.match(html, new RegExp(`<body data-borough="${route.slug}" data-default-boards="all" data-route-fixed="true">`));
     assert.match(html, new RegExp(`<h1 id="page-title">${route.name} 311 dashboard</h1>`));
     assert.match(html, new RegExp(`<strong><u>${route.name}</u></strong>`));
-    assert.match(html, /type="module" src="\.\/js\/dashboard\.js"/);
+    assert.match(html, /type="module" src="\.\/js\/dashboard\.js(?:\?[^"]+)?"/);
     assert.doesNotMatch(html, /app\.powerbi\.com/i);
   }
 });

@@ -12,10 +12,24 @@ const monthFormatter = new Intl.DateTimeFormat("en-US", {
   timeZone: "UTC",
 });
 const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-const palette = ["#3b6cf6", "#a513b6", "#0c8763", "#c45500", "#008299", "#8762cd", "#ea172b", "#21883f", "#6379b7", "#777677"];
+const palette = ["#103fef", "#1700ae", "#007a33", "#b45f06", "#007c91", "#7a2e8e", "#c10e1a", "#4c6b16", "#3157a4", "#595959"];
+let chartThemeApplied = false;
+
+function applyChartTheme() {
+  if (chartThemeApplied) return;
+  window.Chart.defaults.color = "#555555";
+  window.Chart.defaults.borderColor = "#e5e5e5";
+  window.Chart.defaults.font.family = '"Noto Sans", Arial, sans-serif';
+  window.Chart.defaults.font.size = 13;
+  window.Chart.defaults.plugins.legend.labels.color = "#333333";
+  window.Chart.defaults.plugins.legend.labels.usePointStyle = true;
+  window.Chart.defaults.plugins.legend.labels.pointStyle = "circle";
+  chartThemeApplied = true;
+}
 
 function requireChartJs() {
   if (!window.Chart) throw new Error("Chart.js did not load.");
+  applyChartTheme();
 }
 
 function replaceChart(canvasId, configuration) {
@@ -113,7 +127,7 @@ export function renderTimelineChart(result) {
         label: "Requests",
         data: result.rows.map((row) => row.count),
         borderColor: palette[0],
-        backgroundColor: "rgba(59, 108, 246, 0.14)",
+        backgroundColor: "rgba(16, 63, 239, 0.12)",
         borderWidth: 3,
         pointRadius: result.rows.length > 45 ? 0 : 2,
         pointHoverRadius: 5,
