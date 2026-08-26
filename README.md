@@ -4,6 +4,8 @@ BoardStat is an interactive tool for New York City’s community boards. Its bro
 
 This repository contains the static GitHub Pages application, its data-access modules, and dependency-free regression tests.
 
+Production is served from the `gh-pages` branch. See `DEPLOYMENT.md` for the maintainer-only, fast-forward release and rollback procedure.
+
 **IF you are looking for tutorals on how to use BoardStat's features, please check out our indepth page-by-page [videos on BetaNYC's YouTube](https://youtu.be/Q8JJfaizWik).**
 
 | Borough  | URL |

@@ -50,6 +50,8 @@ Review screenshots: [desktop](docs/screenshots/manhattan-desktop.png) and [390px
 
 Observed anonymous-API route timings varied with Socrata and browser cache state. Representative uncached Queens and Staten Island selections completed in 6.4s and 1.6s. Cold Bronx and Brooklyn defaults completed in 16.7s and 18.9s, so the draft remains above the aspirational 15-second default budget even though both completed within the enforced 45-second deadline. This limitation must remain visible during review.
 
+The connected browser-testing environment exposes Chrome only. Firefox and Safari were not silently substituted with another Chromium run. A source compatibility audit found no browser-vendor APIs in the application path: it uses standard ES modules, `fetch`, `AbortController`, `URLSearchParams`, DOM APIs, Chart.js, and Leaflet. That audit reduces risk but does not replace the pending real-engine checks.
+
 ## Acceptance requirements
 
 - Default views should complete within 15 seconds under an ordinary broadband connection.
@@ -60,7 +62,24 @@ Observed anonymous-API route timings varied with Socrata and browser cache state
 
 ## Pull-request automation
 
-The draft introduces the repository's first GitHub Actions workflow. No check run was reported immediately after opening the fork-based draft PR; an upstream maintainer may need to authorize workflows from the contributor before CI evidence appears. Until then, the passing local commands above are reproducible evidence, not a substitute for an upstream check.
+The draft introduces the repository's first GitHub Actions workflow. Implementation head `59c087a` passed the workflow in the contributor fork on August 26, 2026: [BoardStat checks run 32994886159](https://github.com/jflashman/BoardStat/actions/runs/32994886159). GitHub does not surface that fork-owned run in the upstream cross-repository PR check list, so the linked run and reproducible local commands remain the available evidence until an upstream workflow exists.
+
+## Licensing audit
+
+GitHub's detected-license metadata was checked across 124 active BetaNYC repositories on August 26, 2026; none reported an SPDX license. BoardStat's README says its documents are CC BY-SA 4.0, but it does not clearly license application code. There is therefore no defensible organization-wide code-license default to infer. The draft documents all introduced third-party dependencies and leaves the project-license decision explicitly with BetaNYC maintainers.
+
+## Human sign-off checklist
+
+The named reviewer should record their name and date in the table above and confirm each item before the PR leaves draft:
+
+- Read the PR explanation, `README.md`, `DEPLOYMENT.md`, and this validation record.
+- Inspect the SoQL construction, route-borough safeguards, 2019/2020 split, bounded rankings, timeout, cache, and cancellation behavior.
+- Re-run the dependency-free tests and live validation; investigate any changed total rather than updating expected evidence blindly.
+- Exercise all eight views in Firefox and Safari at desktop and mobile widths, including address lookup, both map modes, reset, back/forward, empty results, and retry.
+- Use keyboard-only navigation and a screen reader for filters, tabs, chart summaries, map context, and scrollable tables.
+- Confirm the AI-use disclosure accurately describes the work and that no unapproved nonpublic data was supplied to AI tools.
+- Confirm the project-license decision and the maintainer who will perform the `master` to `gh-pages` release.
+- Record every defect found and its disposition; do not sign off with unresolved production-blocking findings.
 
 ## AI-use record
 
