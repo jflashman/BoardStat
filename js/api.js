@@ -11,6 +11,7 @@ export const FILTER_OPTION_LIMIT = 5000;
 export const RANKING_CANDIDATE_LIMIT = 1000;
 export const HOTSPOT_LIMIT = 100;
 export const REQUEST_TIMEOUT_MS = 45_000;
+export const CACHE_TTL_MS = 5 * 60_000;
 
 const API_ROOT = "https://data.cityofnewyork.us/resource";
 const EARLIEST_DATE = DATASETS.historical.start;
@@ -58,6 +59,20 @@ function daysInRange(startDate, endDate) {
   const start = Date.parse(`${startDate}T00:00:00Z`);
   const end = Date.parse(`${endDate}T00:00:00Z`);
   return Math.round((end - start) / 86_400_000) + 1;
+}
+
+function timelinePeriods(filters, granularity) {
+  const date = new Date(`${filters.startDate}T00:00:00Z`);
+  if (granularity === "month") date.setUTCDate(1);
+  const periods = [];
+  while (date.toISOString().slice(0, 10) <= filters.endDate) {
+    if (!filters.years?.length || filters.years.includes(date.getUTCFullYear())) {
+      periods.push(date.toISOString().slice(0, -1));
+    }
+    if (granularity === "day") date.setUTCDate(date.getUTCDate() + 1);
+    else date.setUTCMonth(date.getUTCMonth() + 1);
+  }
+  return periods;
 }
 
 function validateStringValues(values, name, maximum = 25) {
@@ -183,14 +198,16 @@ async function fetchRows(url, signal) {
 }
 
 function cacheRows(url, rows) {
-  responseCache.set(url, rows);
+  responseCache.set(url, { rows, expiresAt: Date.now() + CACHE_TTL_MS });
   if (responseCache.size > MAX_CACHE_ENTRIES) {
     responseCache.delete(responseCache.keys().next().value);
   }
 }
 
 function getInFlightRequest(url) {
-  if (inFlightRequests.has(url)) return inFlightRequests.get(url);
+  const existing = inFlightRequests.get(url);
+  // An immediate refresh can arrive before an aborted fetch has settled.
+  if (existing && !existing.controller.signal.aborted) return existing;
   const controller = new AbortController();
   const entry = { controller, subscribers: 0, promise: null, timedOut: false };
   const timeoutId = setTimeout(() => {
@@ -199,6 +216,7 @@ function getInFlightRequest(url) {
   }, REQUEST_TIMEOUT_MS);
   entry.promise = fetchRows(url, controller.signal)
     .then((rows) => {
+      controller.signal.throwIfAborted();
       cacheRows(url, rows);
       return rows;
     })
@@ -248,10 +266,12 @@ async function query(parameters, { signal, datasetId = DATASETS.current.id } = {
   const url = buildUrl(parameters, datasetId);
   if (signal?.aborted) throw signal.reason || new DOMException("The request was aborted.", "AbortError");
   if (responseCache.has(url)) {
-    const rows = responseCache.get(url);
+    const cached = responseCache.get(url);
     responseCache.delete(url);
-    responseCache.set(url, rows);
-    return rows;
+    if (cached.expiresAt > Date.now()) {
+      responseCache.set(url, cached);
+      return cached.rows;
+    }
   }
   return subscribeToRequest(getInFlightRequest(url), signal);
 }
@@ -379,7 +399,10 @@ export async function getTimeline(filters, options) {
   }), options);
   const rows = mergeCounts(results, (row) => row.period, (period, count) => ({ period, count }))
     .sort((first, second) => first.period.localeCompare(second.period));
-  return { granularity, rows };
+  const counts = new Map(rows.map((row) => [row.period.slice(0, 10), row.count]));
+  return { granularity, rows: rows.length ? timelinePeriods(filters, granularity).map((period) => ({
+    period, count: counts.get(period.slice(0, 10)) || 0,
+  })) : [] };
 }
 
 export async function getComplaintTimeline(filters, complaintTypes, options) {
@@ -392,6 +415,8 @@ export async function getComplaintTimeline(filters, complaintTypes, options) {
     where: buildWhere(comparisonFilters, slice, ["complaint_type IS NOT NULL"]),
     group: "period, complaint_type",
     order: "period ASC, complaint_type ASC",
+    // Socrata otherwise truncates grouped results at 1,000 rows.
+    limit: timelinePeriods(slice, granularity).length * Math.max(complaintTypes.length, 1),
   }), options);
   const rows = mergeCounts(
     results,
@@ -401,7 +426,7 @@ export async function getComplaintTimeline(filters, complaintTypes, options) {
       return { period, complaintType, count };
     },
   ).sort((first, second) => first.period.localeCompare(second.period) || first.complaintType.localeCompare(second.complaintType));
-  return { granularity, complaintTypes, rows };
+  return { granularity, complaintTypes, rows, periods: timelinePeriods(filters, granularity) };
 }
 
 export async function getDescriptorTimeline(filters, options) {
@@ -429,7 +454,7 @@ export async function getDescriptorTimeline(filters, options) {
     .sort((first, second) => second[1] - first[1] || first[0].localeCompare(second[0]))
     .slice(0, 8)
     .map(([descriptor]) => descriptor);
-  return { granularity, descriptors, rows: rows.filter((row) => descriptors.includes(row.descriptor)) };
+  return { granularity, descriptors, rows: rows.filter((row) => descriptors.includes(row.descriptor)), periods: timelinePeriods(filters, granularity) };
 }
 
 export async function getAverageDaysToClose(filters, options) {
@@ -605,13 +630,15 @@ export async function searchAddresses(filters, rawTerm, options) {
     .trim()
     .slice(0, 60);
   if (term.length < 2) return [];
+  // Source addresses can contain repeated spaces; preserve their exact spelling in results.
+  const pattern = term.toUpperCase().split(/\s+/).map(escapeSoqlLiteral).join("%");
 
   const results = await querySlices(filters, (slice) => ({
     select: "incident_address, count(*) AS count",
     where: buildWhere(
       filters,
       slice,
-      ["incident_address IS NOT NULL", `upper(incident_address) LIKE '%${escapeSoqlLiteral(term.toUpperCase())}%'`],
+      ["incident_address IS NOT NULL", `upper(incident_address) LIKE '%${pattern}%'`],
       { omit: ["addresses"] },
     ),
     group: "incident_address",
