@@ -22,8 +22,7 @@ function applyChartTheme() {
   window.Chart.defaults.font.family = '"Noto Sans", Arial, sans-serif';
   window.Chart.defaults.font.size = 13;
   window.Chart.defaults.plugins.legend.labels.color = "#333333";
-  window.Chart.defaults.plugins.legend.labels.usePointStyle = true;
-  window.Chart.defaults.plugins.legend.labels.pointStyle = "circle";
+  window.Chart.defaults.plugins.legend.labels.usePointStyle = false;
   chartThemeApplied = true;
 }
 
@@ -36,6 +35,8 @@ function replaceChart(canvasId, configuration) {
   requireChartJs();
   chartInstances.get(canvasId)?.destroy();
   const canvas = document.getElementById(canvasId);
+  renderChartData(canvas, configuration.data);
+  distinguishSeries(configuration);
   const chart = new window.Chart(canvas, configuration);
   chartInstances.set(canvasId, chart);
 }
@@ -43,6 +44,112 @@ function replaceChart(canvasId, configuration) {
 function destroyChart(canvasId) {
   chartInstances.get(canvasId)?.destroy();
   chartInstances.delete(canvasId);
+  document.getElementById(`${canvasId}-data`)?.remove();
+  document.getElementById(canvasId)?.removeAttribute("aria-details");
+}
+
+// Every plotted value has the same label and position in the equivalent table.
+function chartDataRows(data) {
+  return data.labels.map((label, index) => [label, ...data.datasets.map((series) => series.data[index] ?? 0)]);
+}
+
+function renderChartData(canvas, data) {
+  const id = `${canvas.id}-data`;
+  let details = document.getElementById(id);
+  if (!details) {
+    details = document.createElement("details");
+    details.id = id;
+    details.className = "chart-data";
+    canvas.closest(".chart-wrap").after(details);
+  }
+  const title = canvas.getAttribute("aria-label") || "Chart";
+  const summary = document.createElement("summary");
+  summary.textContent = `View data: ${title}`;
+  const region = document.createElement("div");
+  region.className = "table-scroll";
+  region.tabIndex = 0;
+  region.setAttribute("role", "region");
+  region.setAttribute("aria-label", `${title} data`);
+  const table = document.createElement("table");
+  const caption = document.createElement("caption");
+  caption.textContent = `${title} — all displayed values`;
+  table.append(caption);
+  const head = document.createElement("thead");
+  const header = document.createElement("tr");
+  ["Category / period", ...data.datasets.map((series) => series.label || "Requests")].forEach((label) => {
+    const cell = document.createElement("th");
+    cell.scope = "col";
+    cell.textContent = label;
+    header.append(cell);
+  });
+  head.append(header);
+  const body = document.createElement("tbody");
+  chartDataRows(data).forEach((values) => {
+    const row = document.createElement("tr");
+    values.forEach((value, index) => {
+      const cell = document.createElement(index ? "td" : "th");
+      if (!index) cell.scope = "row";
+      cell.textContent = index ? numberFormatter.format(value) : value;
+      row.append(cell);
+    });
+    body.append(row);
+  });
+  table.append(head, body);
+  region.append(table);
+  details.replaceChildren(summary, region);
+  canvas.setAttribute("aria-details", id);
+}
+
+function seriesPattern(index, color) {
+  const tile = document.createElement("canvas");
+  tile.width = tile.height = 16;
+  const context = tile.getContext("2d");
+  context.fillStyle = color;
+  context.fillRect(0, 0, 16, 16);
+  context.strokeStyle = "white";
+  context.fillStyle = "white";
+  context.lineWidth = 2;
+  const kind = index % 10;
+  if (kind < 4 || kind === 8) {
+    context.beginPath();
+    if (kind === 0 || kind === 3 || kind === 8) { context.moveTo(0, 8); context.lineTo(16, 8); }
+    if (kind === 1 || kind === 3) { context.moveTo(8, 0); context.lineTo(8, 16); }
+    if (kind === 2 || kind === 8) { context.moveTo(0, 16); context.lineTo(16, 0); }
+    context.stroke();
+  } else if (kind === 4) {
+    context.beginPath(); context.arc(8, 8, 3, 0, Math.PI * 2); context.fill();
+  } else if (kind === 5) {
+    context.strokeRect(4, 4, 8, 8);
+  } else if (kind === 6) {
+    context.beginPath(); context.moveTo(0, 0); context.lineTo(16, 16); context.stroke();
+  } else if (kind === 7) {
+    context.beginPath(); context.moveTo(0, 8); context.lineTo(8, 0); context.lineTo(16, 8); context.lineTo(8, 16); context.closePath(); context.stroke();
+  } else {
+    context.fillRect(2, 2, 5, 5); context.fillRect(10, 10, 5, 5);
+  }
+  return context.createPattern(tile, "repeat");
+}
+
+function distinguishSeries(configuration) {
+  const datasets = configuration.data.datasets;
+  if (configuration.type === "line" && datasets.length > 1) {
+    configuration.options.plugins.legend.labels = { usePointStyle: true, boxWidth: 24, boxHeight: 16 };
+    datasets.forEach((series, index) => {
+      series.borderDash = index === 0 ? [] : [2 + index * 2, 3, 2, 3];
+      series.pointStyle = ["circle", "triangle", "rect", "rectRot", "cross", "star", "crossRot", "dash", "line"][index % 9];
+      series.pointRadius = configuration.data.labels.length > 45 ? 2 : 4;
+    });
+  } else if (configuration.type === "doughnut") {
+    configuration.options.plugins.legend.labels = { ...configuration.options.plugins.legend.labels, boxWidth: 32, boxHeight: 20 };
+    datasets[0].backgroundColor = configuration.data.labels.map((_, index) => seriesPattern(index, palette[index % palette.length]));
+  } else if (datasets.length > 1) {
+    configuration.options.plugins.legend.labels = { boxWidth: 32, boxHeight: 20 };
+    datasets.forEach((series, index) => {
+      series.backgroundColor = seriesPattern(index, palette[index % palette.length]);
+      series.borderColor = "#333333";
+      series.borderWidth = 1;
+    });
+  }
 }
 
 function writeSummary(elementId, text) {
