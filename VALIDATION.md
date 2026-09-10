@@ -13,6 +13,47 @@ This file is the durable review record for the browser-native BoardStat migratio
 
 The subsequent [September 10 code review](docs/review-2026-09-10.md) records reproduced defects, local corrections, and the scope of the follow-up validation.
 
+## September 10 follow-up evidence
+
+The proposed branch at `ac5c3dc` includes the security hardening and accessibility
+changes merged through fork PRs #11 and #12. The suite now has **42 passing tests**.
+Both PR #12 CI runs passed:
+[pull-request run](https://github.com/jflashman/BoardStat/actions/runs/34488239779)
+and [branch run](https://github.com/jflashman/BoardStat/actions/runs/34488235303).
+
+- [Accessibility validation](ACCESSIBILITY.md) records Chrome/axe checks across
+  the seven active routes, all eight Manhattan views, expanded chart/map tables,
+  keyboard interactions, and color-vision simulations. No confirmed axe violations
+  remained in the tested states after targeted retests; map contrast required
+  manual inspection. Actual VoiceOver/NVDA speech testing remains pending.
+- The scoped PR #12 security review found no vulnerabilities in the tested paths.
+  A local Chrome harness exercised hostile HTML/SVG/script strings in chart/map
+  content, labels, hotspot details, error text, and URL filters. Payloads remained
+  inert text. One hundred rapid activations of one hotspot produced one detail
+  request; a synthetic 500-point map sample rendered in approximately 42 ms on the
+  test machine. These results do not establish general resistance to denial of
+  service or prove the security of every dependency or hosting configuration.
+- The DOM test doubles check selected rendering values and state transitions.
+  They do not emulate browser HTML parsing, layout, event propagation, or screen
+  readers, and must not be treated as browser-level accessibility certification.
+- The final readability cleanup removes a duplicate prototype-logo attribute,
+  names the chart patterns, and expands compressed rendering/CSS statements.
+  All ten pattern drawing sequences and their repeat order were compared with
+  the pre-cleanup implementation and matched exactly. CSS declarations and their
+  order are unchanged. All seven active HTML pages were checked for duplicate
+  attributes; regression, JavaScript syntax, and whitespace checks passed.
+- Cleanup browser retests passed for mobile chart legends, empty-state reflow,
+  request-popup focus restoration, and hotspot loading focus. The first live
+  recent-request map scan reported a target-size warning at 320px; an immediate
+  repeat did not reproduce it. Treat map target sizing as data/viewport-sensitive
+  and retain it for manual review, using the equivalent table actions. This
+  cleanup does not change map geometry or assert that every zoom/data combination
+  passes automated target-size checks. Map contrast still requires manual review.
+
+This evidence supplements the dated matrix below. It does not complete independent
+human review, Firefox/Safari testing, screen-reader speech testing, or production
+approval. The slow cold-load cases and hosting limitations below remain applicable.
+
 ## Reproducible checks
 
 ```bash
