@@ -285,16 +285,23 @@ export function renderMapHotspots(result, center = DEFAULT_CENTER, loadDetails) 
     accessibleMarker(circle, `${hotspot.address || location.join(", ")}: ${Number(hotspot.count).toLocaleString("en-US")} requests`, popup);
     const showDetails = async () => {
       if (generation !== renderGeneration || typeof loadDetails !== "function" || pending) return;
-      [details, tableDetails].forEach((target) => { target.textContent = "Loading leading complaint details…"; });
+      [details, tableDetails].forEach((target) => {
+        target.textContent = "Loading leading complaint details…";
+      });
       button.setAttribute("aria-disabled", "true");
       try {
-        if (!cached && !pending) pending = Promise.resolve().then(() => loadDetails(hotspot));
+        if (!cached && !pending) {
+          pending = Promise.resolve().then(() => loadDetails(hotspot));
+        }
         const rows = cached || await pending;
         if (generation !== renderGeneration) return;
         cached = rows;
         [details, tableDetails].forEach((target) => {
           target.replaceChildren();
-          if (!rows.length) { target.textContent = "No complaint details are available for this hotspot."; return; }
+          if (!rows.length) {
+            target.textContent = "No complaint details are available for this hotspot.";
+            return;
+          }
           const list = document.createElement("ol");
           rows.slice(0, 5).forEach((row) => {
             const item = document.createElement("li");

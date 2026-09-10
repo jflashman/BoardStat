@@ -100,6 +100,11 @@ function renderChartData(canvas, data) {
   canvas.setAttribute("aria-details", id);
 }
 
+const seriesPatterns = Object.freeze([
+  "horizontal", "vertical", "diagonal", "grid", "dots",
+  "squares", "reverse-diagonal", "diamonds", "diagonal-horizontal", "checkerboard",
+]);
+
 function seriesPattern(index, color) {
   const tile = document.createElement("canvas");
   tile.width = tile.height = 16;
@@ -109,23 +114,44 @@ function seriesPattern(index, color) {
   context.strokeStyle = "white";
   context.fillStyle = "white";
   context.lineWidth = 2;
-  const kind = index % 10;
-  if (kind < 4 || kind === 8) {
+  const kind = seriesPatterns[index % seriesPatterns.length];
+  if (["horizontal", "vertical", "diagonal", "grid", "diagonal-horizontal"].includes(kind)) {
     context.beginPath();
-    if (kind === 0 || kind === 3 || kind === 8) { context.moveTo(0, 8); context.lineTo(16, 8); }
-    if (kind === 1 || kind === 3) { context.moveTo(8, 0); context.lineTo(8, 16); }
-    if (kind === 2 || kind === 8) { context.moveTo(0, 16); context.lineTo(16, 0); }
+    if (["horizontal", "grid", "diagonal-horizontal"].includes(kind)) {
+      context.moveTo(0, 8);
+      context.lineTo(16, 8);
+    }
+    if (["vertical", "grid"].includes(kind)) {
+      context.moveTo(8, 0);
+      context.lineTo(8, 16);
+    }
+    if (["diagonal", "diagonal-horizontal"].includes(kind)) {
+      context.moveTo(0, 16);
+      context.lineTo(16, 0);
+    }
     context.stroke();
-  } else if (kind === 4) {
-    context.beginPath(); context.arc(8, 8, 3, 0, Math.PI * 2); context.fill();
-  } else if (kind === 5) {
+  } else if (kind === "dots") {
+    context.beginPath();
+    context.arc(8, 8, 3, 0, Math.PI * 2);
+    context.fill();
+  } else if (kind === "squares") {
     context.strokeRect(4, 4, 8, 8);
-  } else if (kind === 6) {
-    context.beginPath(); context.moveTo(0, 0); context.lineTo(16, 16); context.stroke();
-  } else if (kind === 7) {
-    context.beginPath(); context.moveTo(0, 8); context.lineTo(8, 0); context.lineTo(16, 8); context.lineTo(8, 16); context.closePath(); context.stroke();
+  } else if (kind === "reverse-diagonal") {
+    context.beginPath();
+    context.moveTo(0, 0);
+    context.lineTo(16, 16);
+    context.stroke();
+  } else if (kind === "diamonds") {
+    context.beginPath();
+    context.moveTo(0, 8);
+    context.lineTo(8, 0);
+    context.lineTo(16, 8);
+    context.lineTo(8, 16);
+    context.closePath();
+    context.stroke();
   } else {
-    context.fillRect(2, 2, 5, 5); context.fillRect(10, 10, 5, 5);
+    context.fillRect(2, 2, 5, 5);
+    context.fillRect(10, 10, 5, 5);
   }
   return context.createPattern(tile, "repeat");
 }
