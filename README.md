@@ -58,6 +58,8 @@ node --test tests/*.test.mjs
 
 Run the optional live validation against NYC Open Data with `node tests/live-api-validation.mjs`. It is intentionally excluded from CI because it depends on an external public service.
 
+See [accessibility validation](ACCESSIBILITY.md) for chart and map data alternatives, keyboard and color-vision checks, and remaining human screen-reader verification.
+
 ### Worksheet workflow parity
 
 The live dashboard preserves its concise default views and loads the more expensive training-workflow analyses only when requested. Optional details include complaint/descriptor and address rankings, address-specific history, status by agency, calendar-month complaint mix, and a hotspot map mode.
