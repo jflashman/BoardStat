@@ -16,6 +16,25 @@ Production is served from the `gh-pages` branch. See `DEPLOYMENT.md` for the mai
 | Queens | https://boardstat.beta.nyc/queens |
 | Staten Island | https://boardstat.beta.nyc/statenisland |
 
+## Using the dashboard
+
+Choose a borough from the site navigation. Borough dashboards open on **Board Overview**, with all permitted boards in that borough selected for the last 30 days. Use the numbered tabs to switch views:
+
+| View | What you can explore |
+| --- | --- |
+| 1. Set Filters | Review your selection and adjust the shared filters. |
+| 2. Board Overview | Total requests, Community Board totals, leading complaints and descriptors, and optional detailed rankings. |
+| 3. Address Lookup | Search and select exact incident addresses, inspect address-specific charts, and read recent matching requests. |
+| 4. Map | Switch between a recent-request sample and high-volume hotspots with complaint details. |
+| 5. Agency & Status | Requests by agency and status, average closure time, and optional status-by-agency analysis. |
+| 6. Trends | Requests over time and comparisons between complaint types. |
+| 7. Annual | Request totals by year. |
+| 8. Monthly | Calendar-month totals or a comparison of the complaint mix. |
+
+**Shared filters** are available from every view. Changes apply across the dashboard; **Reset filters** restores the borough defaults. The URL records the selected filters and view, so you can copy it to share a selection or use your browser's Back and Forward buttons to revisit it.
+
+Expand **View data** to read complete chart values or the map's matching sample in a table. Charts use patterns or distinct marker shapes alongside color, and map tables provide keyboard-accessible actions. Wide tables scroll horizontally. If a request fails, use **Retry current view**; any retained results are labeled as belonging to an earlier successful load. See [accessibility validation](ACCESSIBILITY.md) for tested coverage and remaining screen-reader verification.
+
 ## File an Issue 
 We're tracking all issues via this [repo's issue cue](https://github.com/BetaNYC/BoardStat/issues).
 
