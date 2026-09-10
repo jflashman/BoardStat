@@ -117,7 +117,7 @@ export function renderBoardChart(rows) {
     rows,
     noun: "Community Boards",
     color: palette[4],
-    limit: 15,
+    limit: rows.length,
     horizontal: false,
   });
 }
@@ -250,7 +250,7 @@ export function renderComplaintComparisonChart(result) {
     return;
   }
 
-  const periods = [...new Set(result.rows.map((row) => row.period))].sort();
+  const periods = result.periods || [...new Set(result.rows.map((row) => row.period))].sort();
   const datasets = result.complaintTypes.map((complaintType, index) => {
     const counts = new Map(
       result.rows
@@ -288,7 +288,7 @@ export function renderDescriptorTimelineChart(result) {
     writeSummary("address-descriptors-summary", "Select at least one complaint type to compare its descriptors over time.");
     return;
   }
-  const periods = [...new Set(result.rows.map((row) => row.period))].sort();
+  const periods = result.periods || [...new Set(result.rows.map((row) => row.period))].sort();
   const datasets = result.descriptors.map((descriptor, index) => {
     const counts = new Map(result.rows.filter((row) => row.descriptor === descriptor).map((row) => [row.period, row.count]));
     return {

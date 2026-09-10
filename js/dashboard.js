@@ -23,7 +23,7 @@ import {
   getTotalRequests,
   searchAddresses,
   validateFilters,
-} from "./api.js?v=20260826-3";
+} from "./api.js?v=20260910-2";
 import { BOROUGHS, getBoroughConfig } from "./boroughs.js";
 import {
   renderAgencyChart,
@@ -40,7 +40,7 @@ import {
   renderMonthlyChart,
   renderStatusChart,
   renderTimelineChart,
-} from "./charts.js?v=20260826-3";
+} from "./charts.js?v=20260910-2";
 import { renderMapHotspots, renderMapPoints } from "./map.js?v=20260826-3";
 
 const configuredRoute = getBoroughConfig(document.body.dataset.borough);
@@ -253,6 +253,7 @@ function optionRowsFor(filterName) {
 
 function renderCheckboxOptions(filterName) {
   const container = document.getElementById(OPTION_CONTAINERS[filterName]);
+  const focusedValue = container.contains(document.activeElement) ? document.activeElement.value : null;
   const selected = new Set(state[filterName].map(String));
   const rows = optionRowsFor(filterName);
   const known = new Set(rows.map((row) => String(row.label)));
@@ -291,6 +292,9 @@ function renderCheckboxOptions(filterName) {
   }
   container.replaceChildren(fragment);
   applyOptionSearch(container.id);
+  if (focusedValue !== null) {
+    [...container.querySelectorAll("input")].find((input) => input.value === focusedValue)?.focus({ preventScroll: true });
+  }
 }
 
 function renderAllFilterOptions() {
@@ -338,8 +342,12 @@ function selectionSummaryItems() {
 function renderStateSummary() {
   const activeSelections = ARRAY_FILTERS.reduce((sum, filterName) => sum + state[filterName].length, 0) + state.years.length;
   elements.filterCount.textContent = `${activeSelections} active selection${activeSelections === 1 ? "" : "s"}`;
-  const start = dateFormatter.format(new Date(`${state.startDate}T00:00:00Z`));
-  const end = dateFormatter.format(new Date(`${state.endDate}T00:00:00Z`));
+  const formatDate = (value) => {
+    const date = new Date(`${value}T00:00:00Z`);
+    return Number.isNaN(date.getTime()) ? "Choose a date" : dateFormatter.format(date);
+  };
+  const start = formatDate(state.startDate);
+  const end = formatDate(state.endDate);
   const boardSummary = state.boards.length <= 3 ? state.boards.join(", ") : `${state.boards.length} boards`;
   let datasetText = "dataset unavailable until filters are valid";
   try {
@@ -442,15 +450,17 @@ function isEmptyResult(data) {
 }
 
 async function loadPanel(panelId, task, render, emptyMessage = "") {
+  const controller = activeViewController;
   setPanelLoading(panelId);
   try {
     const data = await task();
+    if (controller.signal.aborted || activeViewController !== controller) return "aborted";
     render(data);
     getPanel(panelId).dataset.hasContent = "true";
     setPanelReady(panelId, isEmptyResult(data) ? emptyMessage : "");
     return "success";
   } catch (error) {
-    if (error.name === "AbortError") return "aborted";
+    if (controller.signal.aborted || activeViewController !== controller || error.name === "AbortError") return "aborted";
     console.error(`BoardStat panel failed: ${panelId}`, error);
     setPanelError(panelId, error);
     return "failed";
@@ -795,12 +805,12 @@ async function refreshFilterOptions() {
   elements.filterOptionsStatus.textContent = "Refreshing filter options…";
   try {
     const results = await getFilterOptions(toApiFilters(), { signal: controller.signal });
-    if (filterOptionsController !== controller) return;
+    if (controller.signal.aborted || filterOptionsController !== controller) return;
     lastFilterOptions = results;
     ["complaints", "descriptors", "agencies", "statuses"].forEach(renderCheckboxOptions);
     elements.filterOptionsStatus.textContent = "Filter options updated.";
   } catch (error) {
-    if (error.name === "AbortError") return;
+    if (controller.signal.aborted || filterOptionsController !== controller || error.name === "AbortError") return;
     elements.filterOptionsStatus.textContent = `Filter options could not be refreshed. ${error.message}`;
   }
 }
@@ -816,15 +826,31 @@ function scheduleOptionRefresh() {
   optionRefreshTimer = window.setTimeout(refreshFilterOptions, OPTION_REFRESH_DELAY);
 }
 
+function invalidatePendingWork() {
+  window.clearTimeout(refreshTimer);
+  window.clearTimeout(optionRefreshTimer);
+  window.clearTimeout(addressSearchTimer);
+  activeViewController?.abort();
+  filterOptionsController?.abort();
+  addressSearchController?.abort();
+  elements.addressSuggestions.replaceChildren();
+  elements.addressSearchStatus.textContent = "";
+  document.querySelectorAll('[data-has-content="true"], [aria-busy="true"]').forEach((panel) => {
+    const message = panel.querySelector(".panel-state");
+    if (!message) return;
+    panel.setAttribute("aria-busy", "false");
+    if (panel.dataset.hasContent === "true") panel.dataset.stale = "true";
+    message.textContent = "Selection changed. Refresh this view to load matching results.";
+  });
+}
+
 function handleFilterStateChange({ push = false } = {}) {
+  invalidatePendingWork();
   renderStateSummary();
   renderSelectedAddresses();
   const message = getValidationMessage();
   showValidation(message);
   if (message) {
-    window.clearTimeout(refreshTimer);
-    activeViewController?.abort();
-    filterOptionsController?.abort();
     elements.filterOptionsStatus.textContent = "Filter options are unchanged until the selection is valid.";
     elements.status.textContent = "Dashboard was not refreshed.";
     elements.retry.disabled = false;
@@ -837,6 +863,7 @@ function handleFilterStateChange({ push = false } = {}) {
 
 function setActiveView(view, { push = false, focusTab = false } = {}) {
   if (!VIEWS.includes(view)) return;
+  window.clearTimeout(refreshTimer);
   state.view = view;
   document.querySelectorAll("[data-view]").forEach((button) => {
     const active = button.dataset.view === view;
@@ -880,13 +907,13 @@ async function runAddressSearch() {
   elements.addressSearchStatus.textContent = "Searching addresses…";
   try {
     const rows = await searchAddresses(toApiFilters(), term, { signal: controller.signal });
-    if (addressSearchController !== controller) return;
+    if (controller.signal.aborted || addressSearchController !== controller) return;
     renderAddressSuggestions(rows);
     elements.addressSearchStatus.textContent = rows.length
       ? `${rows.length} address suggestion${rows.length === 1 ? "" : "s"} found.`
       : "No matching public incident addresses found.";
   } catch (error) {
-    if (error.name === "AbortError") return;
+    if (controller.signal.aborted || addressSearchController !== controller || error.name === "AbortError") return;
     elements.addressSearchStatus.textContent = `Address search failed. ${error.message}`;
   }
 }
@@ -959,8 +986,9 @@ document.addEventListener("click", (event) => {
 });
 
 elements.reset.addEventListener("click", () => {
-  window.clearTimeout(refreshTimer);
-  window.clearTimeout(optionRefreshTimer);
+  invalidatePendingWork();
+  elements.addressSearch.value = "";
+  document.querySelectorAll("[data-option-search]").forEach((input) => { input.value = ""; });
   state = getDefaultState();
   elements.rankingsDetails.open = false;
   elements.agencyStatusDetails.open = false;
@@ -985,6 +1013,8 @@ elements.clearAddresses.addEventListener("click", () => {
 
 elements.addressSearch.addEventListener("input", () => {
   window.clearTimeout(addressSearchTimer);
+  addressSearchController?.abort();
+  elements.addressSuggestions.replaceChildren();
   addressSearchTimer = window.setTimeout(runAddressSearch, ADDRESS_SEARCH_DELAY);
 });
 
@@ -1050,6 +1080,7 @@ if (elements.boroughRoute) {
 }
 
 window.addEventListener("popstate", () => {
+  invalidatePendingWork();
   state = parseUrlState();
   syncFormFromState();
   renderSelectedAddresses();

@@ -4,11 +4,14 @@ This file is the durable review record for the browser-native BoardStat migratio
 
 ## Human review
 
-**Status: in progress.** A named human reviewer must inspect the implementation, methodology, screenshots, and validation results before the draft pull request is marked ready for review.
+**Status: contributor walkthrough recorded; independent review remains pending.** The contributor confirmed a manual walkthrough in [PR #105](https://github.com/BetaNYC/BoardStat/pull/105#issuecomment-5430440691) on August 26, 2026. The PR is open and no longer draft. That comment does not separately record Firefox, Safari, or assistive-technology results; those checks remain pending below.
 
 | Reviewer | Date | Areas reviewed | Findings and resolutions |
 | --- | --- | --- | --- |
-| Pending | Pending | Source, data methodology, usability, accessibility | Pending |
+| jflashman | 2026-08-26 | Contributor-reported manual walkthrough and development process | Confirmed in the linked PR comment; individual browser and accessibility results not separately recorded. |
+| Independent reviewer | Pending | Source, data methodology, usability, accessibility | Pending |
+
+The subsequent [September 10 code review](docs/review-2026-09-10.md) records reproduced defects, local corrections, and the scope of the follow-up validation.
 
 ## Reproducible checks
 
@@ -70,7 +73,7 @@ GitHub's detected-license metadata was checked across 124 active BetaNYC reposit
 
 ## Human sign-off checklist
 
-The named reviewer should record their name and date in the table above and confirm each item before the PR leaves draft:
+The named reviewer should record their name and date in the table above and confirm each item before production approval:
 
 - Read the PR explanation, `README.md`, `DEPLOYMENT.md`, and this validation record.
 - Inspect the SoQL construction, route-borough safeguards, 2019/2020 split, bounded rankings, timeout, cache, and cancellation behavior.

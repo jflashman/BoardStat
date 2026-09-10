@@ -38,6 +38,8 @@ In the meantime, you can browse our training materials.
 
 The borough dashboards query NYC Open Data's [2010–2019](https://data.cityofnewyork.us/Social-Services/311-Service-Requests-from-2010-to-2019/76ig-c548/about_data) and [2020–present](https://data.cityofnewyork.us/Social-Services/311-Service-Requests-from-2020-to-Present/erm2-nwe9/about_data) 311 datasets directly from the browser. Queries always constrain both the route borough and its permitted Community Board values. Date ranges crossing January 1, 2020 are split between the two datasets and compatible aggregate results are merged in the browser.
 
+Successful responses are reused in a bounded in-memory cache for up to five minutes; revisiting a view after expiry fetches fresh results. There is no background polling.
+
 Aggregation is pushed to Socrata with SoQL. The raw-request table and default map use bounded newest-first samples rather than downloading every matching record. High-cardinality rankings that span both datasets are explicitly labeled as leading candidates because each dataset must be ranked before its candidates can be merged. Exact totals and low-cardinality aggregates are not approximated.
 
 ## Development
