@@ -119,6 +119,11 @@ export function validateFilters(filters) {
   if (filters.startDate > filters.endDate) {
     throw new TypeError("Start date must be on or before end date.");
   }
+  const today = new Date();
+  const latestDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  if (filters.endDate > latestDate) {
+    throw new TypeError("End date must be today or earlier.");
+  }
 }
 
 function buildStringInClause(field, values) {

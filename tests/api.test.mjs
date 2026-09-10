@@ -55,6 +55,22 @@ async function loadApi() {
   return import(`../js/api.js?test=${moduleNumber}`);
 }
 
+test("future URL dates are rejected before queries or timeline expansion", async () => {
+  const api = await loadApi();
+  let requests = 0;
+  globalThis.fetch = async () => { requests += 1; return jsonResponse([]); };
+  for (const endDate of ["9999-12-31", "9998-12-31"]) {
+    const filters = baseFilters({ endDate });
+    assert.throws(() => api.validateFilters(filters), /today or earlier/);
+    await assert.rejects(async () => api.getTimeline(filters), /today or earlier/);
+    await assert.rejects(async () => api.getComplaintTimeline(filters), /today or earlier/);
+  }
+  assert.equal(requests, 0);
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  assert.doesNotThrow(() => api.validateFilters(baseFilters({ startDate: "2010-01-01", endDate: today })));
+});
+
 test("borough configuration contains unique scoped options and no global unspecified value", () => {
   assert.deepEqual(Object.keys(BOROUGHS), ["bronx", "brooklyn", "manhattan", "queens", "statenisland"]);
   Object.values(BOROUGHS).forEach((route) => {

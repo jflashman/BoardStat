@@ -16,7 +16,7 @@ test("production routes retain analytics, fixed borough scope, and no Power BI e
   for (const borough of Object.values(BOROUGHS)) {
     const html = await source(`${borough.slug}.html`);
     assert.match(html, new RegExp(`<body data-borough="${borough.slug}" data-default-boards="all" data-route-fixed="true">`));
-    assert.match(html, /G-TJ936HGY1Z/);
+    assert.match(html, /src="\.\/js\/analytics\.js\?/);
     assert.match(html, /rel="icon" href="\.\/images\/BetaNYC_short_white_on_blue\.png"/);
     assert.doesNotMatch(html, /app\.powerbi\.com/i);
   }
