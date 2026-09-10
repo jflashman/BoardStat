@@ -2,6 +2,8 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <meta name="referrer" content="no-referrer" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js https://unpkg.com/leaflet@1.9.4/dist/leaflet.js https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js https://unpkg.com/esri-leaflet@3.0.19/dist/esri-leaflet.js https://unpkg.com/esri-leaflet-vector@4.3.0/dist/esri-leaflet-vector.js; style-src 'self' 'unsafe-inline' https://unpkg.com https://use.fontawesome.com; font-src 'self' https://use.fontawesome.com data:; img-src 'self' data: blob: https://beta.nyc https://*.arcgis.com https://*.arcgisonline.com https://*.openstreetmap.org; connect-src 'self' https://data.cityofnewyork.us https://*.arcgis.com https://*.arcgisonline.com https://*.openstreetmap.org; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="Experimental BoardStat dashboard powered by live NYC Open Data." />
     <title>BoardStat Historical and Borough Prototype</title>
@@ -345,6 +347,6 @@
     <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" integrity="sha384-eXVCORTRlv4FUUgS/xmOyr66XBVraen8ATNLMESp92FKXLAMiKkerixTiBvXriZr" crossorigin="anonymous"></script>
     <script src="https://unpkg.com/esri-leaflet@3.0.19/dist/esri-leaflet.js" integrity="sha384-2EpnechKmjshAhcJgZr0/dexkJdbcRJm+qsQtCjFsfBP/u5HZmrSa9lpmD7u2t5T" crossorigin="anonymous"></script>
     <script src="https://unpkg.com/esri-leaflet-vector@4.3.0/dist/esri-leaflet-vector.js" integrity="sha384-eqNHr2L7UBNcqucrcptWuSRiPZ/mz1TNRdqXyFv9QY79vkhJhuLiCarG0K3rxKVl" crossorigin="anonymous"></script>
-    <script type="module" src="./js/dashboard.js?v=20260910-2"></script>
+    <script type="module" src="./js/dashboard.js?v=20260910-security-1"></script>
   </body>
 </html>

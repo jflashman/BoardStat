@@ -3,6 +3,8 @@
   <head>
     <!-- Required meta tags -->
     <meta charset="utf-8" />
+    <meta name="referrer" content="no-referrer" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://code.jquery.com/jquery-3.7.1.min.js https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js; style-src 'self' 'unsafe-inline' https://unpkg.com https://use.fontawesome.com; font-src 'self' https://use.fontawesome.com data:; img-src 'self' data: blob: https://beta.nyc https://*.arcgis.com https://*.arcgisonline.com https://*.openstreetmap.org; connect-src 'self' https://data.cityofnewyork.us https://*.arcgis.com https://*.arcgisonline.com https://*.openstreetmap.org; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'" />
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, shrink-to-fit=no"
@@ -14,21 +16,8 @@
     <title>NYC BoardStat Home</title>
     <link rel="icon" href="./images/BetaNYC_short_white_on_blue.png" />
 
-    <!-- Global site tag (gtag.js) - Google Analytics -->
-    <!-- Google tag (gtag.js) -->
-    <script
-      async
-      src="https://www.googletagmanager.com/gtag/js?id=G-TJ936HGY1Z"
-    ></script>
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag() {
-        dataLayer.push(arguments);
-      }
-      gtag("js", new Date());
-
-      gtag("config", "G-TJ936HGY1Z");
-    </script>
+    <!-- Existing aggregate page analytics; dashboard filters stay local. -->
+    <script defer src="./js/analytics.js?v=20260910-security-1"></script>
 
     <!-- Font Awesome -->
     <link
@@ -40,15 +29,6 @@
 
     <!-- NYC Theme CSS -->
     <link rel="stylesheet" href="./css/theme.css" />
-    <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag() {
-        dataLayer.push(arguments);
-      }
-      gtag("js", new Date());
-
-      gtag("config", "UA-58265408-6");
-    </script>
   </head>
   <body style="margin: 0px; padding: 0px">
     <header id="global-header" role="banner">
@@ -288,8 +268,8 @@
 
     <!-- jQuery (full, compressed version) -->
     <script
-      src="https://code.jquery.com/jquery-3.3.1.min.js"
-      integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8="
+      src="https://code.jquery.com/jquery-3.7.1.min.js"
+      integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo="
       crossorigin="anonymous"
     ></script>
 

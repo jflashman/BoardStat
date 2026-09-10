@@ -66,7 +66,7 @@ The default map remains a newest-first sample of up to 250 request markers per a
 
 ## Third-party software and services
 
-BoardStat loads pinned releases of Chart.js, Leaflet, Leaflet.markercluster, Esri Leaflet, and Esri Leaflet Vector from public CDNs. Static CDN assets include Subresource Integrity metadata. Map tiles are provided by Esri and OpenStreetMap contributors with visible attribution. The original production analytics, jQuery, Popper, Bootstrap, Font Awesome, and NYC theme dependencies are preserved. See `THIRD_PARTY_NOTICES.md` for versions and licenses; self-hosted fonts and their SIL Open Font License are documented in `fonts/README.md`.
+BoardStat loads pinned releases of Chart.js, Leaflet, Leaflet.markercluster, Esri Leaflet, and Esri Leaflet Vector from public CDNs. Static CDN assets include Subresource Integrity metadata. Map tiles are provided by Esri and OpenStreetMap contributors with visible attribution. Existing GA4 pageview measurement is retained in a separate document that receives no dashboard filters or referrer; previews send no analytics. jQuery is updated to 3.7.1; Popper, Bootstrap, Font Awesome, and NYC theme dependencies are preserved. Supported dates are January 1, 2010 through today. See `SECURITY.md` for browser protections and the remaining hosting-header work. See `THIRD_PARTY_NOTICES.md` for versions and licenses; self-hosted fonts and their SIL Open Font License are documented in `fonts/README.md`.
 
 ## AI assistance and human verification
 

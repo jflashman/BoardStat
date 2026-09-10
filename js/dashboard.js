@@ -23,7 +23,7 @@ import {
   getTotalRequests,
   searchAddresses,
   validateFilters,
-} from "./api.js?v=20260910-2";
+} from "./api.js?v=20260910-security-1";
 import { BOROUGHS, getBoroughConfig } from "./boroughs.js";
 import {
   renderAgencyChart,
