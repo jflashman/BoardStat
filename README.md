@@ -6,7 +6,7 @@ This repository contains the static GitHub Pages application, its data-access mo
 
 Production is served from the `gh-pages` branch. See `DEPLOYMENT.md` for the maintainer-only, fast-forward release and rollback procedure.
 
-**IF you are looking for tutorals on how to use BoardStat's features, please check out our indepth page-by-page [videos on BetaNYC's YouTube](https://youtu.be/Q8JJfaizWik).**
+For worksheets and videos, see [Training documents](#training-documents). The navigation below describes the browser-native implementation in this branch; see [the validation record](VALIDATION.md) for review and release-readiness status.
 
 | Borough  | URL |
 | ------------- | ------------- |
@@ -16,8 +16,27 @@ Production is served from the `gh-pages` branch. See `DEPLOYMENT.md` for the mai
 | Queens | https://boardstat.beta.nyc/queens |
 | Staten Island | https://boardstat.beta.nyc/statenisland |
 
+## Using the dashboard
+
+Choose a borough from the site navigation. Borough dashboards open on **Board Overview**, with all permitted boards in that borough selected for the last 30 days. Use the numbered tabs to switch views:
+
+| View | What you can explore |
+| --- | --- |
+| 1. Set Filters | Review your selection and adjust the shared filters. |
+| 2. Board Overview | Total requests, Community Board totals, leading complaints and descriptors, and optional detailed rankings. |
+| 3. Address Lookup | Search and select exact incident addresses, inspect address-specific charts, and read recent matching requests. |
+| 4. Map | Switch between a recent-request sample and high-volume hotspots with complaint details. |
+| 5. Agency & Status | Requests by agency and status, average closure time, and optional status-by-agency analysis. |
+| 6. Trends | Requests over time and comparisons between complaint types. |
+| 7. Annual | Request totals by year. |
+| 8. Monthly | Calendar-month totals or a comparison of the complaint mix. |
+
+**Shared filters** are available from every view. Changes apply across the dashboard; **Reset filters** restores the borough defaults. The URL records the selected filters and view, so you can copy it to share a selection or use your browser's Back and Forward buttons to revisit it.
+
+Expand **View data** to read complete chart values or the map's matching sample in a table. Charts use patterns or distinct marker shapes alongside color, and map tables provide keyboard-accessible actions. Wide tables scroll horizontally. If a request fails, use **Retry current view**; any retained results are labeled as belonging to an earlier successful load. See [accessibility validation](ACCESSIBILITY.md) for tested coverage and remaining screen-reader verification.
+
 ## File an Issue 
-We're tracking all issues via this [repo's issue cue](https://github.com/BetaNYC/BoardStat/issues).
+We're tracking issues in this [repository's issue queue](https://github.com/BetaNYC/BoardStat/issues).
 
 ### Development Process and Methodology:
 BoardStat was conceived with the Manhattan Borough President Gale A. Brewer as a simple 311 analysis tool. Through research conducted by Civic Innovation Fellows, key features were baked into a prototype. During the Spring semester of 2016 - 2017, fellows and BetaNYC staff, with assistance from Microsoft Civic Chicago and NYC, developed a prototype using PowerBI. Through group and one-on-one meetings, MBPO staff, Community District staff, and Community Board members helped refine key features. 
@@ -28,11 +47,10 @@ BoardStat was created with funds and support from the Alfred P. Sloan Foundation
 ## Training Documents
 BetaNYC routinely hosts 90 min public training sessions. To find out about the next training session, join our [meetup](https://meetup.com/betanyc). If you are a Manhattan Community Board District Office staff member or Community Board member, email us at 'boardstat@manhattanbp.nyc.gov' to set up a personal one-on-one training. 
 
-**IF you are looking for tutorals on how to use BoardStat's features, please check out our indepth page-by-page [videos on BetaNYC's YouTube](https://youtu.be/Q8JJfaizWik).**
+Watch the [page-by-page training videos on BetaNYC's YouTube](https://youtu.be/Q8JJfaizWik). Earlier training materials may show the Power BI interface; use the navigation guide above for the browser-native dashboard.
 
 In the meantime, you can browse our training materials.
  * [BoardStat Training - Data Journey Worksheet](https://docs.google.com/document/d/1DHgVLrm-X1gs1rwovhpWA5En_ozcQnTWHYobmG9_B0A/edit) - This is the worksheet BetaNYC uses to teach BoardStat. You can find companion slides [here](http://bit.ly/betanyc_datajourney_manhattan).
- * [Training Videos](https://) - In development
  
 ## Data and methodology
 
