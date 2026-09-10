@@ -2,16 +2,19 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <meta name="referrer" content="no-referrer" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js https://unpkg.com/leaflet@1.9.4/dist/leaflet.js https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js https://unpkg.com/esri-leaflet@3.0.19/dist/esri-leaflet.js https://unpkg.com/esri-leaflet-vector@4.3.0/dist/esri-leaflet-vector.js; style-src 'self' 'unsafe-inline' https://unpkg.com https://use.fontawesome.com; font-src 'self' https://use.fontawesome.com data:; img-src 'self' data: blob: https://beta.nyc https://*.arcgis.com https://*.arcgisonline.com https://*.openstreetmap.org; connect-src 'self' https://data.cityofnewyork.us https://*.arcgis.com https://*.arcgisonline.com https://*.openstreetmap.org; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="description" content="Experimental BoardStat dashboard powered by live NYC Open Data." />
     <title>BoardStat Historical and Borough Prototype</title>
 
     <link rel="icon" href="./images/BetaNYC_short_white_on_blue.png" />
     <link rel="stylesheet" href="./css/theme.css" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" crossorigin="anonymous" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" crossorigin="anonymous" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha384-sHL9NAb7lN7rfvG5lfHpm643Xkcjzp4jFvuavGOndn6pjVqS6ny56CAt3nsEVT4H" crossorigin="anonymous" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" integrity="sha384-pmjIAcz2bAn0xukfxADbZIb3t8oRT9Sv0rvO+BR5Csr6Dhqq+nZs59P0pPKQJkEV" crossorigin="anonymous" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" integrity="sha384-wgw+aLYNQ7dlhK47ZPK7FRACiq7ROZwgFNg0m04avm4CaXS+Z9Y7nMu8yNjBKYC+" crossorigin="anonymous" />
     <link rel="stylesheet" href="./css/prototype.css?v=20260826-3" />
+    <link rel="stylesheet" href="./css/accessibility.css?v=20260910-1" />
   </head>
   <body data-borough="manhattan">
     <a class="skip-link" href="#dashboard">Skip to dashboard</a>
@@ -47,7 +50,7 @@
       </div>
     </header>
 
-    <main id="dashboard" class="prototype-container dashboard-shell">
+    <main tabindex="-1" id="dashboard" class="prototype-container dashboard-shell">
       <section class="hero" aria-labelledby="page-title">
         <div>
           <p class="eyebrow">Live NYC 311 data</p>
@@ -115,42 +118,42 @@
                 <legend>Community Boards</legend>
                 <button type="button" class="text-button" data-clear-filter="boards">Clear</button>
                 <input class="option-search" type="search" placeholder="Find a board" aria-label="Find a Community Board option" data-option-search="board-options" />
-                <div id="board-options" class="checkbox-options" aria-label="Community Board options"></div>
+                <div id="board-options" class="checkbox-options"></div>
               </fieldset>
 
               <fieldset class="filter-group">
                 <legend>Complaint Types</legend>
                 <button type="button" class="text-button" data-clear-filter="complaints">Clear</button>
                 <input class="option-search" type="search" placeholder="Find a complaint" aria-label="Find a complaint type option" data-option-search="complaint-options" />
-                <div id="complaint-options" class="checkbox-options" aria-label="Complaint type options"></div>
+                <div id="complaint-options" class="checkbox-options"></div>
               </fieldset>
 
               <fieldset class="filter-group">
                 <legend>Descriptors</legend>
                 <button type="button" class="text-button" data-clear-filter="descriptors">Clear</button>
                 <input class="option-search" type="search" placeholder="Find a descriptor" aria-label="Find a descriptor option" data-option-search="descriptor-options" />
-                <div id="descriptor-options" class="checkbox-options" aria-label="Descriptor options"></div>
+                <div id="descriptor-options" class="checkbox-options"></div>
               </fieldset>
 
               <fieldset class="filter-group">
                 <legend>Agencies</legend>
                 <button type="button" class="text-button" data-clear-filter="agencies">Clear</button>
                 <input class="option-search" type="search" placeholder="Find an agency" aria-label="Find an agency option" data-option-search="agency-options" />
-                <div id="agency-options" class="checkbox-options" aria-label="Agency options"></div>
+                <div id="agency-options" class="checkbox-options"></div>
               </fieldset>
 
               <fieldset class="filter-group">
                 <legend>Statuses</legend>
                 <button type="button" class="text-button" data-clear-filter="statuses">Clear</button>
                 <input class="option-search" type="search" placeholder="Find a status" aria-label="Find a status option" data-option-search="status-options" />
-                <div id="status-options" class="checkbox-options" aria-label="Status options"></div>
+                <div id="status-options" class="checkbox-options"></div>
               </fieldset>
 
               <fieldset class="filter-group">
                 <legend>Years</legend>
                 <button type="button" class="text-button" data-clear-filter="years">Clear</button>
                 <p class="option-note">Optional non-contiguous year filter.</p>
-                <div id="year-options" class="checkbox-options compact-options" aria-label="Year options"></div>
+                <div id="year-options" class="checkbox-options compact-options"></div>
               </fieldset>
             </div>
           </form>
@@ -159,7 +162,7 @@
         </div>
       </details>
 
-      <div class="dashboard-toolbar" aria-label="Dashboard refresh status">
+      <div class="dashboard-toolbar" role="group" aria-label="Dashboard refresh status">
         <div class="dashboard-status-row">
           <p id="dashboard-status" class="dashboard-status" role="status" aria-live="polite"></p>
           <button id="retry-dashboard" class="text-button retry-button" type="button" aria-describedby="dashboard-status">Retry current view</button>
@@ -209,13 +212,13 @@
           <div class="detail-grid">
             <article id="complaint-pairs-panel" class="detail-panel" aria-labelledby="complaint-pairs-heading">
               <h2 id="complaint-pairs-heading">Complaint and descriptor pairs</h2>
-              <div class="table-scroll" tabindex="0" aria-label="Scrollable complaint and descriptor rankings table"><table><caption class="visually-hidden">Top complaint and descriptor pairs</caption><thead><tr><th scope="col">Complaint Type</th><th scope="col">Descriptor</th><th scope="col">Requests</th><th scope="col">Action</th></tr></thead><tbody id="complaint-pairs-body"></tbody></table></div>
+              <div class="table-scroll" role="region" tabindex="0" aria-label="Scrollable complaint and descriptor rankings table"><table><caption class="visually-hidden">Top complaint and descriptor pairs</caption><thead><tr><th scope="col">Complaint Type</th><th scope="col">Descriptor</th><th scope="col">Requests</th><th scope="col">Action</th></tr></thead><tbody id="complaint-pairs-body"></tbody></table></div>
               <p class="panel-state" aria-live="polite"></p>
             </article>
             <article id="address-ranking-panel" class="detail-panel" aria-labelledby="address-ranking-heading">
               <h2 id="address-ranking-heading">Leading incident addresses</h2>
               <p id="address-ranking-note" class="option-note"></p>
-              <div class="table-scroll" tabindex="0" aria-label="Scrollable leading incident addresses table"><table><caption class="visually-hidden">Leading incident addresses</caption><thead><tr><th scope="col">Address</th><th scope="col">Requests</th><th scope="col">Actions</th></tr></thead><tbody id="address-ranking-body"></tbody></table></div>
+              <div class="table-scroll" role="region" tabindex="0" aria-label="Scrollable leading incident addresses table"><table><caption class="visually-hidden">Leading incident addresses</caption><thead><tr><th scope="col">Address</th><th scope="col">Requests</th><th scope="col">Actions</th></tr></thead><tbody id="address-ranking-body"></tbody></table></div>
               <p class="panel-state" aria-live="polite"></p>
             </article>
           </div>
@@ -255,7 +258,7 @@
 
         <article id="address-results-panel" class="dashboard-card table-card" aria-labelledby="recent-heading">
           <div class="card-heading"><div><p class="eyebrow">Newest first</p><h2 id="recent-heading">Matching service requests</h2></div><p class="limit-note">Up to 100 requests</p></div>
-          <div class="table-scroll" tabindex="0" aria-label="Scrollable matching service requests table">
+          <div class="table-scroll" role="region" tabindex="0" aria-label="Scrollable matching service requests table">
             <table>
               <caption class="visually-hidden">Newest NYC 311 requests matching the shared filters</caption>
               <thead><tr><th scope="col">Created</th><th scope="col">Closed</th><th scope="col">Board</th><th scope="col">Complaint Type</th><th scope="col">Descriptor</th><th scope="col">Agency</th><th scope="col">Address</th><th scope="col">Status</th><th scope="col">Dataset</th></tr></thead>
@@ -295,7 +298,7 @@
           <p>Compare the status composition of the ten leading agencies without changing the shared filters.</p>
           <div class="chart-wrap chart-wrap-large"><canvas id="agency-status-chart" role="img" aria-label="Status by agency stacked chart" aria-describedby="agency-status-summary"></canvas></div>
           <p id="agency-status-summary" class="chart-summary"></p>
-          <div class="table-scroll" tabindex="0" aria-label="Scrollable status by agency table"><table><caption class="visually-hidden">Exact status counts for the leading agencies</caption><thead id="agency-status-head"></thead><tbody id="agency-status-body"></tbody></table></div>
+          <div class="table-scroll" role="region" tabindex="0" aria-label="Scrollable status by agency table"><table><caption class="visually-hidden">Exact status counts for the leading agencies</caption><thead id="agency-status-head"></thead><tbody id="agency-status-body"></tbody></table></div>
           <p class="panel-state" aria-live="polite"></p>
         </details>
       </section>
@@ -332,7 +335,7 @@
           <div class="card-heading"><div><p class="eyebrow">Optional comparison</p><h2 id="monthly-complaints-heading">Complaint mix by calendar month</h2></div></div>
           <div class="chart-wrap chart-wrap-large"><canvas id="monthly-complaints-chart" role="img" aria-label="Complaint mix by calendar month chart" aria-describedby="monthly-complaints-summary"></canvas></div>
           <p id="monthly-complaints-summary" class="chart-summary"></p>
-          <div class="table-scroll" tabindex="0" aria-label="Scrollable monthly complaint leaders table"><table><caption class="visually-hidden">Leading complaint type for each calendar month</caption><thead><tr><th scope="col">Month</th><th scope="col">Leading Complaint Type</th><th scope="col">Requests</th></tr></thead><tbody id="monthly-leaders-body"></tbody></table></div>
+          <div class="table-scroll" role="region" tabindex="0" aria-label="Scrollable monthly complaint leaders table"><table><caption class="visually-hidden">Leading complaint type for each calendar month</caption><thead><tr><th scope="col">Month</th><th scope="col">Leading Complaint Type</th><th scope="col">Requests</th></tr></thead><tbody id="monthly-leaders-body"></tbody></table></div>
           <p class="panel-state" aria-live="polite"></p>
         </article>
       </section>
@@ -340,11 +343,11 @@
 
     <footer class="prototype-footer"><div class="prototype-container"><p>BoardStat is a BetaNYC civic technology project. Data is public and provided by NYC 311.</p></div></footer>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
-    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" crossorigin="anonymous"></script>
-    <script src="https://unpkg.com/esri-leaflet@3.0.19/dist/esri-leaflet.js" crossorigin="anonymous"></script>
-    <script src="https://unpkg.com/esri-leaflet-vector@4.3.0/dist/esri-leaflet-vector.js" crossorigin="anonymous"></script>
-    <script type="module" src="./js/dashboard.js?v=20260826-3"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha384-cxOPjt7s7Iz04uaHJceBmS+qpjv2JkIHNVcuOrM+YHwZOmJGBXI00mdUXEq65HTH" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js" integrity="sha384-eXVCORTRlv4FUUgS/xmOyr66XBVraen8ATNLMESp92FKXLAMiKkerixTiBvXriZr" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/esri-leaflet@3.0.19/dist/esri-leaflet.js" integrity="sha384-2EpnechKmjshAhcJgZr0/dexkJdbcRJm+qsQtCjFsfBP/u5HZmrSa9lpmD7u2t5T" crossorigin="anonymous"></script>
+    <script src="https://unpkg.com/esri-leaflet-vector@4.3.0/dist/esri-leaflet-vector.js" integrity="sha384-eqNHr2L7UBNcqucrcptWuSRiPZ/mz1TNRdqXyFv9QY79vkhJhuLiCarG0K3rxKVl" crossorigin="anonymous"></script>
+    <script type="module" src="./js/dashboard.js?v=20260910-a11y-1"></script>
   </body>
 </html>

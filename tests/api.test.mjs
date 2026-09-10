@@ -5,10 +5,14 @@ import test, { afterEach } from "node:test";
 import { BOROUGHS } from "../js/boroughs.js";
 
 const originalFetch = globalThis.fetch;
+const originalSetTimeout = globalThis.setTimeout;
+const originalClearTimeout = globalThis.clearTimeout;
 let moduleNumber = 0;
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  globalThis.setTimeout = originalSetTimeout;
+  globalThis.clearTimeout = originalClearTimeout;
 });
 
 function jsonResponse(body, status = 200) {
@@ -50,6 +54,22 @@ async function loadApi() {
   moduleNumber += 1;
   return import(`../js/api.js?test=${moduleNumber}`);
 }
+
+test("future URL dates are rejected before queries or timeline expansion", async () => {
+  const api = await loadApi();
+  let requests = 0;
+  globalThis.fetch = async () => { requests += 1; return jsonResponse([]); };
+  for (const endDate of ["9999-12-31", "9998-12-31"]) {
+    const filters = baseFilters({ endDate });
+    assert.throws(() => api.validateFilters(filters), /today or earlier/);
+    await assert.rejects(async () => api.getTimeline(filters), /today or earlier/);
+    await assert.rejects(async () => api.getComplaintTimeline(filters), /today or earlier/);
+  }
+  assert.equal(requests, 0);
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  assert.doesNotThrow(() => api.validateFilters(baseFilters({ startDate: "2010-01-01", endDate: today })));
+});
 
 test("borough configuration contains unique scoped options and no global unspecified value", () => {
   assert.deepEqual(Object.keys(BOROUGHS), ["bronx", "brooklyn", "manhattan", "queens", "statenisland"]);
@@ -189,6 +209,7 @@ test("descriptor, agency-status, and monthly complaint aggregates retain their d
   assert.deepEqual(await api.getDescriptorTimeline(filters), {
     granularity: "day",
     descriptors: ["Loud Music", "Banging"],
+    periods: ["2020-01-01T00:00:00.000", "2020-01-02T00:00:00.000"],
     rows: [
       { period: "2020-01-01T00:00:00.000", descriptor: "Banging", count: 2 },
       { period: "2020-01-01T00:00:00.000", descriptor: "Loud Music", count: 4 },
@@ -413,4 +434,127 @@ test("timeline granularity changes after 90 inclusive days", async () => {
   assert.equal((await api.getTimeline(baseFilters({ startDate: "2020-01-01", endDate: "2020-03-31" }))).granularity, "month");
   assert.match(selects[0], /date_trunc_ymd/);
   assert.match(selects[1], /date_trunc_ym\(created_date\)/);
+});
+
+test("requests that exceed the network deadline become actionable Socrata errors", async () => {
+  globalThis.fetch = async (_url, { signal }) => new Promise((_resolve, reject) => {
+    signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+  });
+  globalThis.setTimeout = (callback, delay) => {
+    assert.equal(delay, 45_000);
+    queueMicrotask(callback);
+    return 1;
+  };
+  globalThis.clearTimeout = () => {};
+
+  const api = await loadApi();
+  await assert.rejects(
+    api.getTotalRequests(baseFilters()),
+    (error) => error instanceof api.SocrataError && /took too long/i.test(error.message),
+  );
+});
+
+test("an immediately restarted query does not join its aborted predecessor", async () => {
+  let calls = 0;
+  globalThis.fetch = async (_url, { signal }) => {
+    calls += 1;
+    if (calls > 1) return jsonResponse([{ count: "17" }]);
+    return new Promise((_resolve, reject) => {
+      signal.addEventListener("abort", () => reject(signal.reason), { once: true });
+    });
+  };
+  const api = await loadApi();
+  const controller = new AbortController();
+  const first = api.getTotalRequests(baseFilters(), { signal: controller.signal });
+  const firstRejected = assert.rejects(first, { name: "AbortError" });
+  controller.abort();
+  const replacement = api.getTotalRequests(baseFilters());
+  await firstRejected;
+  assert.equal(await replacement, 17);
+  assert.equal(calls, 2);
+});
+
+test("long complaint comparisons are not cut off at Socrata's default 1000 rows", async () => {
+  const rows = Array.from({ length: 1440 }, (_, index) => ({
+    period: `${2010 + Math.floor(index / 144)}-${String(Math.floor(index / 12) % 12 + 1).padStart(2, "0")}-01T00:00:00.000`,
+    complaint_type: `Complaint ${index % 12}`,
+    count: "1",
+  }));
+  globalThis.fetch = async (url) => jsonResponse(rows.slice(0, Number(requestDetails(url).limit || 1000)));
+  const api = await loadApi();
+  const result = await api.getComplaintTimeline(
+    baseFilters({ startDate: "2010-01-01", endDate: "2019-12-31" }),
+    Array.from({ length: 12 }, (_, index) => `Complaint ${index}`),
+  );
+  assert.equal(result.rows.length, 1440);
+});
+
+test("cached live results expire without extending their lifetime on reads", async (t) => {
+  let now = 1_000;
+  let calls = 0;
+  t.mock.method(Date, "now", () => now);
+  globalThis.fetch = async () => jsonResponse([{ count: String(++calls) }]);
+  const api = await loadApi();
+  assert.equal(await api.getTotalRequests(baseFilters()), 1);
+  now += api.CACHE_TTL_MS - 1;
+  assert.equal(await api.getTotalRequests(baseFilters()), 1);
+  now += 1;
+  assert.equal(await api.getTotalRequests(baseFilters()), 2);
+});
+
+test("timeline includes zero-request days at both edges and between reported days", async () => {
+  globalThis.fetch = async () => jsonResponse([
+    { period: "2020-01-02T00:00:00.000", count: "2" },
+    { period: "2020-01-04T00:00:00.000", count: "3" },
+  ]);
+  const api = await loadApi();
+  const result = await api.getTimeline(baseFilters({ endDate: "2020-01-05" }));
+  assert.deepEqual(result.rows.map((row) => row.count), [0, 2, 0, 3, 0]);
+});
+
+test("monthly zero filling respects selected years and preserves an entirely empty result", async () => {
+  globalThis.fetch = async () => jsonResponse([{ period: "2020-03-01T00:00:00.000", count: "5" }]);
+  const api = await loadApi();
+  const result = await api.getTimeline(baseFilters({ startDate: "2019-01-01", endDate: "2021-12-31", years: [2020] }));
+  assert.equal(result.rows.length, 12);
+  assert.ok(result.rows.every((row) => row.period.startsWith("2020-")));
+  assert.equal(result.rows.reduce((sum, row) => sum + row.count, 0), 5);
+  api.clearApiCache();
+  globalThis.fetch = async () => jsonResponse([]);
+  assert.deepEqual((await api.getTimeline(baseFilters())).rows, []);
+});
+
+test("address lookup tolerates source spacing while retaining exact filter values", async () => {
+  let where;
+  globalThis.fetch = async (url) => {
+    where = requestDetails(url).where;
+    return jsonResponse([{ incident_address: "48 WEST   68 STREET", count: "1" }]);
+  };
+  const api = await loadApi();
+  const rows = await api.searchAddresses(baseFilters(), "48 WEST 68");
+  assert.match(where, /upper\(incident_address\) LIKE '%48%WEST%68%'/);
+  assert.equal(rows[0].label, "48 WEST   68 STREET");
+  await api.searchAddresses(baseFilters(), "O'BRIEN STREET");
+  assert.match(where, /LIKE '%O''BRIEN%STREET%'/);
+});
+
+test("a late aborted response cannot replace the restarted query's cache entry", async () => {
+  let calls = 0;
+  let deliverOldResponse;
+  globalThis.fetch = async () => {
+    calls += 1;
+    if (calls > 1) return jsonResponse([{ count: "2" }]);
+    return new Promise((resolve) => { deliverOldResponse = () => resolve(jsonResponse([{ count: "99" }])); });
+  };
+  const api = await loadApi();
+  const controller = new AbortController();
+  const first = api.getTotalRequests(baseFilters(), { signal: controller.signal });
+  const rejected = assert.rejects(first, { name: "AbortError" });
+  controller.abort();
+  assert.equal(await api.getTotalRequests(baseFilters()), 2);
+  deliverOldResponse();
+  await rejected;
+  await new Promise(setImmediate);
+  assert.equal(await api.getTotalRequests(baseFilters()), 2);
+  assert.equal(calls, 2);
 });

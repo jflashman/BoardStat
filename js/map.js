@@ -5,6 +5,7 @@ let requestLayer;
 let hotspotLayer;
 let routeCenter = DEFAULT_CENTER;
 let fallbackBasemap;
+let renderGeneration = 0;
 
 function requireLeaflet() {
   if (!window.L) throw new Error("Leaflet did not load.");
@@ -45,7 +46,18 @@ function initializeMap() {
   requireLeaflet();
   map = window.L.map("request-map", { scrollWheelZoom: false, maxZoom: 17 }).setView(routeCenter, 11);
   addBasemap();
-  requestLayer = window.L.markerClusterGroup({ showCoverageOnHover: false, maxClusterRadius: 45 }).addTo(map);
+  requestLayer = window.L.markerClusterGroup({
+    showCoverageOnHover: false,
+    maxClusterRadius: 80,
+    iconCreateFunction(cluster) {
+      const count = cluster.getChildCount();
+      return window.L.divIcon({
+        html: `<span aria-hidden="true">${count}</span><span class="visually-hidden">Show ${count} requests</span>`,
+        className: "marker-cluster marker-cluster-small",
+        iconSize: [44, 44],
+      });
+    },
+  }).addTo(map);
   hotspotLayer = window.L.layerGroup().addTo(map);
 }
 
@@ -53,9 +65,91 @@ function createRequestIcon() {
   return window.L.divIcon({
     className: "request-marker-shell",
     html: '<span class="request-marker-dot" aria-hidden="true"></span>',
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
+    iconSize: [44, 44],
+    iconAnchor: [22, 22],
   });
+}
+
+function accessibleMarker(marker, label, popup) {
+  const configure = () => {
+    const element = marker.getElement();
+    if (!element) return;
+    element.setAttribute("role", "button");
+    element.setAttribute("aria-label", label);
+    element.setAttribute("tabindex", "0");
+    element.onkeydown = (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        event.stopPropagation();
+        marker.openPopup();
+      }
+    };
+  };
+  marker.on("add", configure);
+  configure();
+  popup.tabIndex = -1;
+  popup.setAttribute("role", "group");
+  popup.setAttribute("aria-label", label);
+  let returnFocus;
+  marker.on("popupopen", () => {
+    returnFocus = document.activeElement;
+    popup.focus();
+  });
+  popup.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      marker.closePopup();
+    }
+  });
+  marker.on("popupclose", () => {
+    const active = document.activeElement;
+    if (returnFocus?.isConnected && (active === document.body || popup.contains?.(active))) returnFocus.focus();
+  });
+}
+
+function mapDataTable(headers, title) {
+  let details = document.getElementById("map-data");
+  if (!details) {
+    details = document.createElement("details");
+    details.id = "map-data";
+    details.className = "map-data";
+    document.getElementById("request-map").before(details);
+  }
+  const summary = document.createElement("summary");
+  summary.textContent = `View data: ${title}`;
+  const region = document.createElement("div");
+  region.className = "table-scroll";
+  region.tabIndex = 0;
+  region.setAttribute("role", "region");
+  region.setAttribute("aria-label", title);
+  const table = document.createElement("table");
+  const caption = document.createElement("caption");
+  caption.textContent = `${title} — the same bounded sample shown on the map`;
+  const head = document.createElement("thead");
+  const row = document.createElement("tr");
+  headers.forEach((label) => {
+    const cell = document.createElement("th");
+    cell.scope = "col";
+    cell.textContent = label;
+    row.append(cell);
+  });
+  head.append(row);
+  const body = document.createElement("tbody");
+  table.append(caption, head, body);
+  region.append(table);
+  details.replaceChildren(summary, region);
+  return body;
+}
+
+function dataRow(body, values) {
+  const row = document.createElement("tr");
+  values.forEach((value) => {
+    const cell = document.createElement("td");
+    cell.textContent = value || "—";
+    row.append(cell);
+  });
+  body.append(row);
+  return row;
 }
 
 function addTextLine(container, text, className = "map-popup-detail") {
@@ -90,10 +184,13 @@ function createPopup(point) {
 }
 
 export function renderMapPoints(points, center = DEFAULT_CENTER) {
+  renderGeneration += 1;
   routeCenter = center;
   initializeMap();
   requestLayer.clearLayers();
   hotspotLayer.clearLayers();
+  document.getElementById("request-map").setAttribute("aria-label", "Map of recent 311 service requests");
+  const body = mapDataTable(["Complaint", "Descriptor", "Agency", "Status", "Community Board", "Address", "Created", "Request", "Dataset", "Coordinates", "Map action"], "Mapped requests");
 
   const bounds = [];
   points.forEach((point) => {
@@ -102,22 +199,38 @@ export function renderMapPoints(points, center = DEFAULT_CENTER) {
     if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
 
     const location = [latitude, longitude];
-    window.L.marker(location, {
+    const popup = createPopup(point);
+    const marker = window.L.marker(location, {
       alt: point.complaint_type || "311 service request",
       icon: createRequestIcon(),
     })
-      .bindPopup(createPopup(point))
+      .bindPopup(popup)
       .addTo(requestLayer);
+    accessibleMarker(marker, `${point.complaint_type || "311 request"}, ${point.incident_address || location.join(", ")}, request ${point.unique_key || "unknown"}`, popup);
+    const row = dataRow(body, [point.complaint_type, point.descriptor, point.agency, point.status, point.community_board, point.incident_address, point.created_date ? formatSocrataDateTime(point.created_date) : "", point.unique_key, point.datasetLabel, location.join(", ")]);
+    const cell = document.createElement("td");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = `Show request ${point.unique_key || point.complaint_type || "at this location"} on map`;
+    const generation = renderGeneration;
+    button.addEventListener("click", () => {
+      requestLayer.zoomToShowLayer(marker, () => {
+        if (generation === renderGeneration) marker.openPopup();
+      });
+    });
+    cell.append(button);
+    row.append(cell);
     bounds.push(location);
   });
 
   if (bounds.length) {
-    map.fitBounds(bounds, { padding: [24, 24], maxZoom: 15 });
+    map.fitBounds(bounds, { padding: [48, 48], maxZoom: 15 });
   } else {
     map.setView(routeCenter, 11);
   }
 
   window.setTimeout(() => map.invalidateSize(), 0);
+  if (!bounds.length) dataRow(body, ["No mapped requests for this selection."]).firstElementChild.colSpan = 11;
   return bounds.length;
 }
 
@@ -127,16 +240,20 @@ function createHotspotPopup(hotspot) {
   addTextLine(popup, `${Number(hotspot.count).toLocaleString("en-US")} matching requests`);
   const details = document.createElement("div");
   details.className = "hotspot-details";
+  details.setAttribute("role", "status");
   details.textContent = "Open this hotspot to load its leading complaint and descriptor pairs.";
   popup.append(details);
   return { popup, details };
 }
 
 export function renderMapHotspots(result, center = DEFAULT_CENTER, loadDetails) {
+  const generation = ++renderGeneration;
   routeCenter = center;
   initializeMap();
   requestLayer.clearLayers();
   hotspotLayer.clearLayers();
+  document.getElementById("request-map").setAttribute("aria-label", "Map of 311 request hotspots");
+  const body = mapDataTable(["Address", "Requests", "Coordinates", "Complaint details"], "Mapped hotspots");
   const bounds = [];
   const maximum = Math.max(...result.rows.map((row) => Number(row.count) || 0), 1);
 
@@ -145,9 +262,19 @@ export function renderMapHotspots(result, center = DEFAULT_CENTER, loadDetails) 
     const longitude = Number(hotspot.longitude);
     if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
     const location = [latitude, longitude];
-    const radius = 8 + (Math.sqrt(Number(hotspot.count) || 0) / Math.sqrt(maximum)) * 20;
+    const radius = 22 + (Math.sqrt(Number(hotspot.count) || 0) / Math.sqrt(maximum)) * 20;
     const { popup, details } = createHotspotPopup(hotspot);
-    let loaded = false;
+    const row = dataRow(body, [hotspot.address || "Unnamed location", Number(hotspot.count).toLocaleString("en-US"), location.join(", ")]);
+    const cell = document.createElement("td");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = `Load details for ${hotspot.address || location.join(", ")}`;
+    const tableDetails = document.createElement("div");
+    tableDetails.setAttribute("role", "status");
+    cell.append(button, tableDetails);
+    row.append(cell);
+    let pending;
+    let cached;
     const circle = window.L.circleMarker(location, {
       radius,
       color: "#050560",
@@ -155,34 +282,57 @@ export function renderMapHotspots(result, center = DEFAULT_CENTER, loadDetails) 
       fillColor: "#103fef",
       fillOpacity: 0.58,
     }).bindPopup(popup).addTo(hotspotLayer);
-    circle.on("popupopen", async () => {
-      if (loaded || typeof loadDetails !== "function") return;
-      loaded = true;
-      details.textContent = "Loading leading complaint details…";
+    accessibleMarker(circle, `${hotspot.address || location.join(", ")}: ${Number(hotspot.count).toLocaleString("en-US")} requests`, popup);
+    const showDetails = async () => {
+      if (generation !== renderGeneration || typeof loadDetails !== "function" || pending) return;
+      [details, tableDetails].forEach((target) => {
+        target.textContent = "Loading leading complaint details…";
+      });
+      button.setAttribute("aria-disabled", "true");
       try {
-        const rows = await loadDetails(hotspot);
-        details.replaceChildren();
-        if (!rows.length) {
-          details.textContent = "No complaint details are available for this hotspot.";
-          return;
+        if (!cached && !pending) {
+          pending = Promise.resolve().then(() => loadDetails(hotspot));
         }
-        const list = document.createElement("ol");
-        rows.slice(0, 5).forEach((row) => {
-          const item = document.createElement("li");
-          item.textContent = `${row.complaintType}${row.descriptor ? ` — ${row.descriptor}` : ""}: ${Number(row.count).toLocaleString("en-US")}`;
-          list.append(item);
+        const rows = cached || await pending;
+        if (generation !== renderGeneration) return;
+        cached = rows;
+        [details, tableDetails].forEach((target) => {
+          target.replaceChildren();
+          if (!rows.length) {
+            target.textContent = "No complaint details are available for this hotspot.";
+            return;
+          }
+          const list = document.createElement("ol");
+          rows.slice(0, 5).forEach((row) => {
+            const item = document.createElement("li");
+            item.textContent = `${row.complaintType}${row.descriptor ? ` — ${row.descriptor}` : ""}: ${Number(row.count).toLocaleString("en-US")}`;
+            list.append(item);
+          });
+          target.append(list);
         });
-        details.append(list);
       } catch (error) {
-        loaded = false;
-        details.textContent = error.name === "AbortError" ? "Hotspot details were cancelled." : `Hotspot details could not be loaded. ${error.message}`;
+        if (generation !== renderGeneration) return;
+        [details, tableDetails].forEach((target) => {
+          target.textContent = error.name === "AbortError" ? "Hotspot details were cancelled. Retry using Load details." : `Hotspot details could not be loaded. ${error.message}`;
+        });
+      } finally {
+        pending = undefined;
+        button.setAttribute("aria-disabled", "false");
       }
-    });
+    };
+    button.addEventListener("click", showDetails);
+    const retry = document.createElement("button");
+    retry.type = "button";
+    retry.textContent = "Load details / retry";
+    retry.addEventListener("click", showDetails);
+    popup.append(retry);
+    circle.on("popupopen", showDetails);
     bounds.push(location);
   });
 
-  if (bounds.length) map.fitBounds(bounds, { padding: [24, 24], maxZoom: 15 });
+  if (bounds.length) map.fitBounds(bounds, { padding: [48, 48], maxZoom: 15 });
   else map.setView(routeCenter, 11);
   window.setTimeout(() => map.invalidateSize(), 0);
+  if (!bounds.length) dataRow(body, ["No hotspots for this selection."]).firstElementChild.colSpan = 4;
   return bounds.length;
 }
