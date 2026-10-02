@@ -43,7 +43,6 @@ html {
 }
 
 body {
-  min-width: 320px;
   margin: 0;
   color: var(--boardstat-ink);
   background: var(--boardstat-background);
@@ -84,22 +83,14 @@ summary:focus-visible,
 }
 
 .skip-link {
-  position: fixed;
-  top: 0.75rem;
-  left: 0.75rem;
-  z-index: 2000;
-  padding: 0.75rem 1rem;
   border: 2px solid var(--boardstat-white);
   border-radius: var(--boardstat-control-radius);
-  color: var(--boardstat-white);
-  background: var(--boardstat-black);
   font-family: var(--boardstat-font-body);
   font-weight: 700;
   transform: translateY(-180%);
 }
 
 .skip-link:focus {
-  color: var(--boardstat-white);
   transform: translateY(0);
 }
 
@@ -108,7 +99,6 @@ summary:focus-visible,
   margin-inline: auto;
 }
 
-/* The prototype route owns this shell; production routes keep theme.css unchanged. */
 .site-header {
   border-bottom: 1px solid var(--boardstat-border-light);
   background: var(--boardstat-white);
@@ -120,7 +110,8 @@ summary:focus-visible,
 .prototype-nav,
 .hero,
 .section-heading,
-.card-heading {
+.card-heading,
+.selected-address-heading {
   display: flex;
   align-items: center;
 }
@@ -364,18 +355,23 @@ summary:focus-visible,
   padding: 1.25rem;
 }
 
-.filter-card > summary {
+.filter-card > summary,
+.disclosure-card > summary {
   display: flex;
-  min-height: 48px;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  border-radius: var(--boardstat-control-radius);
   cursor: pointer;
   list-style: none;
 }
 
-.filter-card > summary::-webkit-details-marker {
+.filter-card > summary {
+  min-height: 48px;
+  border-radius: var(--boardstat-control-radius);
+}
+
+.filter-card > summary::-webkit-details-marker,
+.disclosure-card > summary::-webkit-details-marker {
   display: none;
 }
 
@@ -398,7 +394,8 @@ summary:focus-visible,
   line-height: 1;
 }
 
-.filter-card[open] > summary::after {
+.filter-card[open] > summary::after,
+.disclosure-card[open] > summary::after {
   content: "−";
 }
 
@@ -422,7 +419,8 @@ summary:focus-visible,
 }
 
 .section-heading,
-.card-heading {
+.card-heading,
+.selected-address-heading {
   justify-content: space-between;
   gap: 1rem;
 }
@@ -458,15 +456,10 @@ summary:focus-visible,
   background: var(--boardstat-action);
 }
 
-.filter-grid,
 .date-filter-grid {
   display: grid;
-  grid-template-columns: minmax(220px, 1.5fr) repeat(2, minmax(165px, 1fr));
-  gap: 1rem;
-}
-
-.date-filter-grid {
   grid-template-columns: repeat(2, minmax(180px, 260px));
+  gap: 1rem;
   margin-bottom: 1rem;
 }
 
@@ -520,16 +513,22 @@ summary:focus-visible,
 }
 
 .option-search,
-#address-search {
+#address-search,
+.form-field select,
+.form-field input {
   width: 100%;
-  min-height: 44px;
-  margin: 0.65rem 0 0.5rem;
-  padding: 0.6rem 0.75rem;
   border: 2px solid var(--boardstat-border);
   border-radius: var(--boardstat-control-radius);
   color: var(--boardstat-ink);
   background: var(--boardstat-white);
   font-family: var(--boardstat-font-body);
+}
+
+.option-search,
+#address-search {
+  min-height: 44px;
+  margin: 0.65rem 0 0.5rem;
+  padding: 0.6rem 0.75rem;
 }
 
 .option-search:focus,
@@ -613,14 +612,8 @@ summary:focus-visible,
 
 .form-field select,
 .form-field input {
-  width: 100%;
   min-height: 48px;
   padding: 0.65rem 0.75rem;
-  border: 2px solid var(--boardstat-border);
-  border-radius: var(--boardstat-control-radius);
-  color: var(--boardstat-ink);
-  background: var(--boardstat-white);
-  font-family: var(--boardstat-font-body);
 }
 
 .form-error {
@@ -669,7 +662,8 @@ summary:focus-visible,
   font-weight: 600;
 }
 
-.dashboard-grid {
+.dashboard-grid,
+.detail-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1.25rem;
@@ -732,19 +726,11 @@ summary:focus-visible,
 .disclosure-card { padding: 0; }
 
 .disclosure-card > summary {
-  display: flex;
   min-height: 64px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
   padding: 1.15rem 1.35rem;
-  cursor: pointer;
-  list-style: none;
 }
 
-.disclosure-card > summary::-webkit-details-marker { display: none; }
 .disclosure-card > summary::after { content: "+"; color: var(--boardstat-action-dark); font-size: 1.6rem; font-weight: 800; }
-.disclosure-card[open] > summary::after { content: "−"; }
 
 .disclosure-card > summary strong {
   display: block;
@@ -755,12 +741,6 @@ summary:focus-visible,
 
 .disclosure-card > :not(summary) { margin-right: 1.35rem; margin-left: 1.35rem; }
 .disclosure-card > :last-child { margin-bottom: 1.35rem; }
-
-.detail-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 1.25rem;
-}
 
 .detail-panel { min-width: 0; }
 .detail-panel h2 { font-size: 1.2rem; }
@@ -1004,13 +984,6 @@ summary:focus-visible,
   background: var(--boardstat-blue-pale);
 }
 
-.selected-address-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-}
-
 .selected-address-heading h3 {
   margin: 0;
   font-family: var(--boardstat-font-display);
@@ -1153,11 +1126,7 @@ tbody tr:hover {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .filter-grid,
-  .date-filter-grid {
-    grid-template-columns: 1fr;
-  }
-
+  .date-filter-grid,
   .dashboard-grid,
   .detail-grid {
     grid-template-columns: 1fr;

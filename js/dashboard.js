@@ -228,17 +228,10 @@ function getCheckedValues(name) {
 }
 
 function readFormState() {
-  state = {
-    ...state,
-    boards: getCheckedValues("boards"),
-    complaints: getCheckedValues("complaints"),
-    descriptors: getCheckedValues("descriptors"),
-    agencies: getCheckedValues("agencies"),
-    statuses: getCheckedValues("statuses"),
-    years: getCheckedValues("years").map(Number),
-    startDate: elements.startDate.value,
-    endDate: elements.endDate.value,
-  };
+  Object.keys(OPTION_CONTAINERS).forEach((name) => { state[name] = getCheckedValues(name); });
+  state.years = state.years.map(Number);
+  state.startDate = elements.startDate.value;
+  state.endDate = elements.endDate.value;
 }
 
 function optionRowsFor(filterName) {
@@ -407,12 +400,8 @@ function showValidation(message) {
   elements.filterError.hidden = !message;
 }
 
-function getPanel(panelId) {
-  return document.getElementById(panelId);
-}
-
 function setPanelLoading(panelId) {
-  const panel = getPanel(panelId);
+  const panel = document.getElementById(panelId);
   panel.classList.remove("is-error");
   panel.setAttribute("aria-busy", "true");
   const hadContent = panel.dataset.hasContent === "true";
@@ -423,7 +412,7 @@ function setPanelLoading(panelId) {
 }
 
 function setPanelReady(panelId, message = "") {
-  const panel = getPanel(panelId);
+  const panel = document.getElementById(panelId);
   panel.classList.remove("is-error");
   delete panel.dataset.stale;
   panel.setAttribute("aria-busy", "false");
@@ -431,7 +420,7 @@ function setPanelReady(panelId, message = "") {
 }
 
 function setPanelError(panelId, error) {
-  const panel = getPanel(panelId);
+  const panel = document.getElementById(panelId);
   panel.classList.add("is-error");
   panel.setAttribute("aria-busy", "false");
   const hadContent = panel.dataset.hasContent === "true";
@@ -456,7 +445,7 @@ async function loadPanel(panelId, task, render, emptyMessage = "") {
     const data = await task();
     if (controller.signal.aborted || activeViewController !== controller) return "aborted";
     render(data);
-    getPanel(panelId).dataset.hasContent = "true";
+    document.getElementById(panelId).dataset.hasContent = "true";
     setPanelReady(panelId, isEmptyResult(data) ? emptyMessage : "");
     return "success";
   } catch (error) {
@@ -479,52 +468,43 @@ function formatSocrataDateTime(value) {
   return dateTimeFormatter.format(date);
 }
 
-function renderRecentRequests(rows) {
-  elements.recentBody.replaceChildren();
-  if (!rows.length) {
-    const row = document.createElement("tr");
-    row.className = "empty-row";
+function createTableRow(values) {
+  const row = document.createElement("tr");
+  values.forEach((value) => {
     const cell = document.createElement("td");
-    cell.colSpan = 9;
-    cell.textContent = "No service requests match these filters.";
+    cell.textContent = value;
     row.append(cell);
-    elements.recentBody.append(row);
-    return;
-  }
-
-  const fragment = document.createDocumentFragment();
-  rows.forEach((request) => {
-    const row = document.createElement("tr");
-    [
-      formatSocrataDateTime(request.created_date),
-      formatSocrataDateTime(request.closed_date),
-      valueOrDash(request.community_board),
-      valueOrDash(request.complaint_type),
-      valueOrDash(request.descriptor),
-      valueOrDash(request.agency),
-      valueOrDash(request.incident_address),
-      valueOrDash(request.status),
-      valueOrDash(request.datasetLabel),
-    ].forEach((value) => {
-      const cell = document.createElement("td");
-      cell.textContent = value;
-      row.append(cell);
-    });
-    fragment.append(row);
   });
-  elements.recentBody.append(fragment);
+  return row;
+}
+
+function replaceTableRows(body, rows, columnCount, emptyMessage) {
+  if (!rows.length) {
+    const row = createTableRow([emptyMessage]);
+    row.className = "empty-row";
+    row.firstElementChild.colSpan = columnCount;
+    rows = [row];
+  }
+  body.replaceChildren(...rows);
+}
+
+function renderRecentRequests(rows) {
+  replaceTableRows(elements.recentBody, rows.map((request) => createTableRow([
+    formatSocrataDateTime(request.created_date),
+    formatSocrataDateTime(request.closed_date),
+    valueOrDash(request.community_board),
+    valueOrDash(request.complaint_type),
+    valueOrDash(request.descriptor),
+    valueOrDash(request.agency),
+    valueOrDash(request.incident_address),
+    valueOrDash(request.status),
+    valueOrDash(request.datasetLabel),
+  ])), 9, "No service requests match these filters.");
 }
 
 function renderComplaintPairs(rows) {
-  elements.pairsBody.replaceChildren();
-  const fragment = document.createDocumentFragment();
-  rows.forEach((item) => {
-    const row = document.createElement("tr");
-    [item.complaintType, item.descriptor, numberFormatter.format(item.count)].forEach((value) => {
-      const cell = document.createElement("td");
-      cell.textContent = value;
-      row.append(cell);
-    });
+  const tableRows = rows.map((item) => {
+    const row = createTableRow([item.complaintType, item.descriptor, numberFormatter.format(item.count)]);
     const actionCell = document.createElement("td");
     const button = document.createElement("button");
     button.type = "button";
@@ -534,30 +514,14 @@ function renderComplaintPairs(rows) {
     button.textContent = "Use as filters";
     actionCell.append(button);
     row.append(actionCell);
-    fragment.append(row);
+    return row;
   });
-  if (!rows.length) {
-    const row = document.createElement("tr");
-    row.className = "empty-row";
-    const cell = document.createElement("td");
-    cell.colSpan = 4;
-    cell.textContent = "No complaint and descriptor pairs match these filters.";
-    row.append(cell);
-    fragment.append(row);
-  }
-  elements.pairsBody.replaceChildren(fragment);
+  replaceTableRows(elements.pairsBody, tableRows, 4, "No complaint and descriptor pairs match these filters.");
 }
 
 function renderAddressRanking(result) {
-  elements.addressRankingBody.replaceChildren();
-  const fragment = document.createDocumentFragment();
-  result.rows.forEach((item) => {
-    const row = document.createElement("tr");
-    [item.label, numberFormatter.format(item.count)].forEach((value) => {
-      const cell = document.createElement("td");
-      cell.textContent = value;
-      row.append(cell);
-    });
+  const tableRows = result.rows.map((item) => {
+    const row = createTableRow([item.label, numberFormatter.format(item.count)]);
     const actionCell = document.createElement("td");
     const addButton = document.createElement("button");
     addButton.type = "button";
@@ -571,21 +535,12 @@ function renderAddressRanking(result) {
     viewButton.textContent = "View address";
     actionCell.append(addButton, viewButton);
     row.append(actionCell);
-    fragment.append(row);
+    return row;
   });
-  if (!result.rows.length) {
-    const row = document.createElement("tr");
-    row.className = "empty-row";
-    const cell = document.createElement("td");
-    cell.colSpan = 3;
-    cell.textContent = "No incident addresses match these filters.";
-    row.append(cell);
-    fragment.append(row);
-  }
-  elements.addressRankingBody.replaceChildren(fragment);
+  replaceTableRows(elements.addressRankingBody, tableRows, 3, "No incident addresses match these filters.");
   document.getElementById("address-ranking-note").textContent = result.isCandidateRanking
-    ? "Leading addresses merged from bounded historical and current dataset candidates; this is not guaranteed to be an exhaustive cross-dataset ranking."
-    : "Top addresses for the applicable dataset and current filters.";
+    ? "Top addresses from a limited set of historical and current results; some addresses may be missing from this ranking."
+    : "Top addresses matching these filters.";
 }
 
 function renderAgencyStatusTable(rows) {
@@ -636,17 +591,8 @@ function renderAgencyStatusTable(rows) {
 
 function renderMonthlyComplaintMix(rows) {
   const { leaders } = renderMonthlyComplaintChart(rows, state.complaints);
-  const fragment = document.createDocumentFragment();
-  leaders.forEach((leader) => {
-    const row = document.createElement("tr");
-    [leader.month, leader.complaintType, numberFormatter.format(leader.count)].forEach((value) => {
-      const cell = document.createElement("td");
-      cell.textContent = value;
-      row.append(cell);
-    });
-    fragment.append(row);
-  });
-  elements.monthlyLeadersBody.replaceChildren(fragment);
+  elements.monthlyLeadersBody.replaceChildren(...leaders.map((leader) =>
+    createTableRow([leader.month, leader.complaintType, numberFormatter.format(leader.count)])));
 }
 
 function renderAverageDays(value) {
@@ -714,7 +660,7 @@ function viewTasks(filters, options) {
           const count = renderMapPoints(points, ROUTE.center);
           const datasets = getDatasetSummary(filters);
           const maximum = 250 * datasets.count;
-          getPanel("map-panel").querySelector(".limit-note").textContent = !datasets.count
+          document.getElementById("map-panel").querySelector(".limit-note").textContent = !datasets.count
             ? "No dataset overlaps the selected dates and years"
             : count
             ? `${numberFormatter.format(count)} of up to ${numberFormatter.format(maximum)} points (${datasets.count} dataset${datasets.count === 1 ? "" : "s"})`
@@ -792,7 +738,7 @@ async function refreshCurrentView() {
   const failures = results.filter((result) => result === "failed").length;
   elements.status.textContent = failures
     ? `View refreshed with ${failures} panel${failures === 1 ? "" : "s"} unavailable.`
-    : "View updated with live NYC Open Data across every applicable dataset.";
+    : "View updated with NYC Open Data.";
   elements.retry.disabled = false;
 }
 
@@ -1030,23 +976,15 @@ elements.agencyStatusDetails.addEventListener("toggle", () => {
   if (elements.agencyStatusDetails.open && state.view === "agency") refreshCurrentView();
 });
 
-document.querySelectorAll('input[name="map-mode"]').forEach((input) => {
-  input.addEventListener("change", () => {
-    if (!input.checked) return;
-    state.mapMode = input.value;
-    syncFormFromState();
-    writeUrl({ push: true });
-    refreshCurrentView();
-  });
-});
-
-document.querySelectorAll('input[name="monthly-mode"]').forEach((input) => {
-  input.addEventListener("change", () => {
-    if (!input.checked) return;
-    state.monthlyMode = input.value;
-    syncFormFromState();
-    writeUrl({ push: true });
-    refreshCurrentView();
+Object.entries({ "map-mode": "mapMode", "monthly-mode": "monthlyMode" }).forEach(([name, stateKey]) => {
+  document.querySelectorAll(`input[name="${name}"]`).forEach((input) => {
+    input.addEventListener("change", () => {
+      if (!input.checked) return;
+      state[stateKey] = input.value;
+      syncFormFromState();
+      writeUrl({ push: true });
+      refreshCurrentView();
+    });
   });
 });
 

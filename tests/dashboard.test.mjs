@@ -34,7 +34,7 @@ test("superseded panel work cannot render or overwrite the newer panel state", a
   const load = controllerFunction("loadPanel", {
     activeViewController: controller,
     setPanelLoading() {}, setPanelReady() { ready += 1; },
-    getPanel() { return { dataset: {} }; }, isEmptyResult() { return false; },
+    document: { getElementById() { return { dataset: {} }; } }, isEmptyResult() { return false; },
     setPanelError() { assert.fail("cancelled work should not report a panel failure"); }, console,
   });
   const pending = load("total-panel", () => new Promise((resolve) => { deliver = resolve; }), () => { renders += 1; });
@@ -88,4 +88,44 @@ test("invalidating filters cancels all work and labels previous results stale", 
   assert.equal(panel["aria-busy"], "false");
   assert.match(message.textContent, /Selection changed/);
   assert.equal(suggestionsCleared, true);
+});
+
+test("ranking tables retain filter actions and replace previous rows when empty", () => {
+  const node = () => ({
+    children: [], dataset: {},
+    append(...children) { this.children.push(...children); },
+    replaceChildren(...children) { this.children = children; },
+    get firstElementChild() { return this.children[0]; },
+    set innerHTML(_) { assert.fail("API values must be rendered as text"); },
+  });
+  const elements = { pairsBody: node(), addressRankingBody: node() };
+  const note = {};
+  const bindings = {
+    elements, document: { createElement: node, getElementById() { return note; } },
+    numberFormatter: new Intl.NumberFormat("en-US"),
+  };
+  for (const name of ["createTableRow", "replaceTableRows", "renderComplaintPairs", "renderAddressRanking"]) {
+    bindings[name] = controllerFunction(name, bindings);
+  }
+
+  bindings.renderComplaintPairs([{ complaintType: "Noise", descriptor: "<b>Loud</b>", count: 1234 }]);
+  const pairCells = elements.pairsBody.children[0].children;
+  assert.equal(pairCells[1].textContent, "<b>Loud</b>");
+  assert.equal(pairCells[2].textContent, "1,234");
+  assert.equal(pairCells[3].children[0].dataset.useComplaint, "Noise");
+  assert.equal(pairCells[3].children[0].dataset.useDescriptor, "<b>Loud</b>");
+
+  bindings.renderAddressRanking({ rows: [{ label: "1 MAIN ST", count: 5 }], isCandidateRanking: true });
+  const actions = elements.addressRankingBody.children[0].children[2].children;
+  assert.equal(actions[0].dataset.addRankedAddress, "1 MAIN ST");
+  assert.equal(actions[1].dataset.viewRankedAddress, "1 MAIN ST");
+  assert.match(note.textContent, /some addresses may be missing/);
+
+  bindings.renderComplaintPairs([]);
+  bindings.renderAddressRanking({ rows: [], isCandidateRanking: false });
+  for (const [body, columns] of [[elements.pairsBody, 4], [elements.addressRankingBody, 3]]) {
+    assert.equal(body.children.length, 1);
+    assert.equal(body.children[0].className, "empty-row");
+    assert.equal(body.children[0].firstElementChild.colSpan, columns);
+  }
 });

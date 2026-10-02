@@ -35,6 +35,12 @@ function replaceChart(canvasId, configuration) {
   requireChartJs();
   chartInstances.get(canvasId)?.destroy();
   const canvas = document.getElementById(canvasId);
+  configuration.options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: 250 },
+    ...configuration.options,
+  };
   renderChartData(canvas, configuration.data);
   distinguishSeries(configuration);
   const chart = new window.Chart(canvas, configuration);
@@ -214,10 +220,7 @@ function renderRankedBar({ canvasId, summaryId, rows, noun, color = palette[0], 
       datasets: [{ label: "Requests", data: displayed.map((row) => row.count), backgroundColor: color }],
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
       indexAxis: horizontal ? "y" : "x",
-      animation: { duration: 250 },
       plugins: { legend: { display: false } },
       scales: { [horizontal ? "x" : "y"]: { beginAtZero: true, ticks: { precision: 0 } } },
     },
@@ -255,22 +258,16 @@ export function renderBoardChart(rows) {
   });
 }
 
-export function renderTimelineChart(result) {
-  if (!result.rows.length) {
-    destroyChart("timeline-chart");
-    writeSummary("timeline-summary", "No requests were reported over this period.");
-    return;
-  }
-
-  replaceChart("timeline-chart", {
+function renderTimeline(canvasId, result, color, backgroundColor) {
+  replaceChart(canvasId, {
     type: "line",
     data: {
       labels: result.rows.map((row) => formatPeriod(row.period, result.granularity)),
       datasets: [{
         label: "Requests",
         data: result.rows.map((row) => row.count),
-        borderColor: palette[0],
-        backgroundColor: "rgba(16, 63, 239, 0.12)",
+        borderColor: color,
+        backgroundColor,
         borderWidth: 3,
         pointRadius: result.rows.length > 45 ? 0 : 2,
         pointHoverRadius: 5,
@@ -279,18 +276,24 @@ export function renderTimelineChart(result) {
       }],
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: { duration: 250 },
       plugins: { legend: { display: false } },
       scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
     },
   });
 
-  const total = result.rows.reduce((sum, row) => sum + row.count, 0);
+  return numberFormatter.format(result.rows.reduce((sum, row) => sum + row.count, 0));
+}
+
+export function renderTimelineChart(result) {
+  if (!result.rows.length) {
+    destroyChart("timeline-chart");
+    writeSummary("timeline-summary", "No requests were reported over this period.");
+    return;
+  }
+  const total = renderTimeline("timeline-chart", result, palette[0], "rgba(16, 63, 239, 0.12)");
   writeSummary(
     "timeline-summary",
-    `${numberFormatter.format(total)} requests shown in ${result.granularity === "day" ? "daily" : "monthly"} intervals.`,
+    `${total} requests shown in ${result.granularity === "day" ? "daily" : "monthly"} intervals.`,
   );
 }
 
@@ -300,32 +303,8 @@ export function renderAddressTimelineChart(result) {
     writeSummary("address-timeline-summary", "No requests were reported over this period for the selected addresses.");
     return;
   }
-  replaceChart("address-timeline-chart", {
-    type: "line",
-    data: {
-      labels: result.rows.map((row) => formatPeriod(row.period, result.granularity)),
-      datasets: [{
-        label: "Requests",
-        data: result.rows.map((row) => row.count),
-        borderColor: palette[4],
-        backgroundColor: "rgba(0, 124, 145, 0.12)",
-        borderWidth: 3,
-        pointRadius: result.rows.length > 45 ? 0 : 2,
-        pointHoverRadius: 5,
-        fill: true,
-        tension: 0.2,
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: { duration: 250 },
-      plugins: { legend: { display: false } },
-      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
-    },
-  });
-  const total = result.rows.reduce((sum, row) => sum + row.count, 0);
-  writeSummary("address-timeline-summary", `${numberFormatter.format(total)} requests across the selected address spellings.`);
+  const total = renderTimeline("address-timeline-chart", result, palette[4], "rgba(0, 124, 145, 0.12)");
+  writeSummary("address-timeline-summary", `${total} requests across the selected address spellings.`);
 }
 
 export function renderAgencyChart(rows) {
@@ -343,9 +322,6 @@ export function renderAgencyChart(rows) {
       datasets: [{ data: displayed.map((row) => row.count), backgroundColor: palette, borderColor: "#ffffff", borderWidth: 2 }],
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: { duration: 250 },
       plugins: { legend: { position: "bottom", labels: { boxWidth: 12, padding: 14 } } },
     },
   });
@@ -366,9 +342,6 @@ export function renderStatusChart(rows) {
       datasets: [{ label: "Requests", data: rows.map((row) => row.count), backgroundColor: palette[2] }],
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: { duration: 250 },
       plugins: { legend: { display: false } },
       scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
     },
@@ -376,22 +349,16 @@ export function renderStatusChart(rows) {
   writeSummary("statuses-summary", `Status totals — ${summarizeTop(rows, "statuses")}.`);
 }
 
-export function renderComplaintComparisonChart(result) {
-  if (!result.rows.length || !result.complaintTypes.length) {
-    destroyChart("comparison-chart");
-    writeSummary("comparison-summary", "No complaint comparison is available for this selection.");
-    return;
-  }
-
+function renderComparisonTimeline(canvasId, result, labels, key) {
   const periods = result.periods || [...new Set(result.rows.map((row) => row.period))].sort();
-  const datasets = result.complaintTypes.map((complaintType, index) => {
+  const datasets = labels.map((label, index) => {
     const counts = new Map(
       result.rows
-        .filter((row) => row.complaintType === complaintType)
+        .filter((row) => row[key] === label)
         .map((row) => [row.period, row.count]),
     );
     return {
-      label: complaintType,
+      label,
       data: periods.map((period) => counts.get(period) || 0),
       borderColor: palette[index % palette.length],
       backgroundColor: palette[index % palette.length],
@@ -401,17 +368,23 @@ export function renderComplaintComparisonChart(result) {
     };
   });
 
-  replaceChart("comparison-chart", {
+  replaceChart(canvasId, {
     type: "line",
     data: { labels: periods.map((period) => formatPeriod(period, result.granularity)), datasets },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: { duration: 250 },
       plugins: { legend: { position: "bottom" } },
       scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
     },
   });
+}
+
+export function renderComplaintComparisonChart(result) {
+  if (!result.rows.length || !result.complaintTypes.length) {
+    destroyChart("comparison-chart");
+    writeSummary("comparison-summary", "No complaint comparison is available for this selection.");
+    return;
+  }
+  renderComparisonTimeline("comparison-chart", result, result.complaintTypes, "complaintType");
   writeSummary("comparison-summary", `Comparing ${result.complaintTypes.join(", ")} over time.`);
 }
 
@@ -421,30 +394,7 @@ export function renderDescriptorTimelineChart(result) {
     writeSummary("address-descriptors-summary", "Select at least one complaint type to compare its descriptors over time.");
     return;
   }
-  const periods = result.periods || [...new Set(result.rows.map((row) => row.period))].sort();
-  const datasets = result.descriptors.map((descriptor, index) => {
-    const counts = new Map(result.rows.filter((row) => row.descriptor === descriptor).map((row) => [row.period, row.count]));
-    return {
-      label: descriptor,
-      data: periods.map((period) => counts.get(period) || 0),
-      borderColor: palette[index % palette.length],
-      backgroundColor: palette[index % palette.length],
-      borderWidth: 2,
-      pointRadius: periods.length > 45 ? 0 : 2,
-      tension: 0.18,
-    };
-  });
-  replaceChart("address-descriptors-chart", {
-    type: "line",
-    data: { labels: periods.map((period) => formatPeriod(period, result.granularity)), datasets },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: { duration: 250 },
-      plugins: { legend: { position: "bottom" } },
-      scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
-    },
-  });
+  renderComparisonTimeline("address-descriptors-chart", result, result.descriptors, "descriptor");
   writeSummary("address-descriptors-summary", `Leading descriptors for the selected complaint filter: ${result.descriptors.join(", ")}.`);
 }
 
@@ -473,10 +423,7 @@ export function renderAgencyStatusChart(rows) {
       })),
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
       indexAxis: "y",
-      animation: { duration: 250 },
       plugins: { legend: { position: "bottom" } },
       scales: { x: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }, y: { stacked: true } },
     },
@@ -497,9 +444,6 @@ export function renderAnnualChart(rows) {
       datasets: [{ label: "Requests", data: rows.map((row) => row.count), backgroundColor: palette[0] }],
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: { duration: 250 },
       plugins: { legend: { display: false } },
       scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
     },
@@ -521,9 +465,6 @@ export function renderMonthlyChart(rows) {
       datasets: [{ label: "Requests", data: monthNames.map((_, index) => counts.get(index + 1) || 0), backgroundColor: palette[1] }],
     },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: { duration: 250 },
       plugins: { legend: { display: false } },
       scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
     },
@@ -566,9 +507,6 @@ export function renderMonthlyComplaintChart(rows, selectedComplaintTypes = []) {
     type: "bar",
     data: { labels: monthNames, datasets },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      animation: { duration: 250 },
       plugins: { legend: { position: "bottom" } },
       scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } },
     },

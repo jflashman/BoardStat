@@ -1,12 +1,23 @@
 # Browser security
 
-The September 10, 2026 remediation covers the home page, five browser-native borough routes, prototype, and their shared modules.
+Active dashboard pages use pinned CDN dependencies with integrity hashes,
+jQuery 3.7.1, a meta Content Security Policy, and `no-referrer`. The CSP restricts
+script sources and disallows inline scripts and eval. Inline styles are still
+needed by the theme, maps, and charts. Dates are limited to 2010 through today.
+The legacy `test.html` snapshot is unsupported and has no new CSP.
 
-- **Medium — vulnerable jQuery:** active production pages use jQuery 3.7.1 with a verified integrity hash. Unused jQuery/Migrate imports were also removed from the legacy `test.html` snapshot.
-- **Medium — analytics filter disclosure:** Google code runs in `analytics.html`, which receives only an allowlisted page name and no parent referrer. Dashboard query strings, fragments, form fields, and history changes are not passed to measurement. The child sanitizes its own URL before loading Google and explicitly supplies clean page location/title and an empty referrer. Automatic initial pageviews are disabled; one explicit pageview retains the existing GA4 measurement ID. Preview hosts send no production analytics. This intentionally removes filter-change, outbound-link, and form measurement from the dashboard, and referral attribution is no longer collected. The same-origin frame separates normal measurement behavior, not malicious third-party code; Google remains a trusted dependency. NYC Open Data necessarily receives the filters used in data queries.
-- **Low — unbounded date ranges:** shared validation rejects dates after the user's local today before querying or expanding timeline buckets. The entire supported 2010–today range remains available, including cross-dataset queries.
-- **Low — missing browser policies (partially addressed):** active documents enforce a meta Content Security Policy and `no-referrer`. Scripts are restricted to local files and the exact pinned CDN paths; inline script and eval are not allowed. Inline styles remain necessary for the theme and map/chart libraries. Map/data endpoints and blob workers are explicitly allowed. The historical WordPress/Power BI `test.html` snapshot receives the referrer policy but is not a supported dashboard and has no new CSP.
+Google Analytics runs in `analytics.html`, which receives an allowlisted page
+name with no parent referrer. It sends one explicit pageview using sanitized
+page metadata. Dashboard filters, form fields, and history changes are not sent;
+referral attribution and dashboard link/form measurement are disabled. Preview
+hosts send no analytics. NYC Open Data receives filters as part of data queries.
 
-The response-header portion remains a hosting task; HTML cannot set HSTS, `X-Content-Type-Options`, `X-Frame-Options`, CSP `frame-ancestors`, or `Permissions-Policy`. See `DEPLOYMENT.md`. A meta CSP does not protect non-HTML responses or prevent other sites from framing BoardStat. No hosting, DNS, Pages settings, or production deployment are changed by this patch.
+The same-origin analytics frame limits normal measurement behavior; Google
+remains a trusted dependency. Tests cover the local scripts, not future Google
+tag behavior or property settings. Verify collection requests after deployment
+as described in [DEPLOYMENT.md](DEPLOYMENT.md).
 
-Run `node --test tests/*.test.mjs` for query/date, rendering, dependency, policy, and analytics metadata regressions. Analytics tests execute the actual local scripts with synthetic sensitive URLs and reject parent-window access. They do not prove the behavior of future Google tag releases or property configuration; verify production collection requests contain no filter values after deployment.
+HSTS, `nosniff`, framing restrictions, and Permissions Policy still require
+hosting configuration. Meta CSP cannot protect non-HTML responses or prevent
+other sites from framing BoardStat. See the [deployment instructions](DEPLOYMENT.md)
+for the remaining header work.

@@ -1,10 +1,6 @@
 # BoardStat
 
-BoardStat is an interactive tool for New York City’s community boards. Its browser-native borough dashboards query live NYC Open Data and provide synchronized summaries, charts, maps, and tables for 311 service requests from 2010 to the present. BoardStat empowers community board staff and members to discover issues and trends within district boundaries while moving beyond open-data access to meaningful use.
-
-This repository contains the static GitHub Pages application, its data-access modules, and dependency-free regression tests.
-
-Production is served from the `gh-pages` branch. See `DEPLOYMENT.md` for the maintainer-only, fast-forward release and rollback procedure.
+BoardStat helps New York City’s community boards explore 311 requests with charts, maps, and tables. The borough dashboards query NYC Open Data directly.
 
 **IF you are looking for tutorals on how to use BoardStat's features, please check out our indepth page-by-page [videos on BetaNYC's YouTube](https://youtu.be/Q8JJfaizWik).**
 
@@ -18,22 +14,7 @@ Production is served from the `gh-pages` branch. See `DEPLOYMENT.md` for the mai
 
 ## Using the dashboard
 
-Choose a borough from the site navigation. Borough dashboards open on **Board Overview**, with all permitted boards in that borough selected for the last 30 days. Use the numbered tabs to switch views:
-
-| View | What you can explore |
-| --- | --- |
-| 1. Set Filters | Review your selection and adjust the shared filters. |
-| 2. Board Overview | Total requests, Community Board totals, leading complaints and descriptors, and optional detailed rankings. |
-| 3. Address Lookup | Search and select exact incident addresses, inspect address-specific charts, and read recent matching requests. |
-| 4. Map | Switch between a recent-request sample and high-volume hotspots with complaint details. |
-| 5. Agency & Status | Requests by agency and status, average closure time, and optional status-by-agency analysis. |
-| 6. Trends | Requests over time and comparisons between complaint types. |
-| 7. Annual | Request totals by year. |
-| 8. Monthly | Calendar-month totals or a comparison of the complaint mix. |
-
-**Shared filters** are available from every view. Changes apply across the dashboard; **Reset filters** restores the borough defaults. The URL records the selected filters and view, so you can copy it to share a selection or use your browser's Back and Forward buttons to revisit it.
-
-Expand **View data** to read complete chart values or the map's matching sample in a table. Charts use patterns or distinct marker shapes alongside color, and map tables provide keyboard-accessible actions. Wide tables scroll horizontally. If a request fails, use **Retry current view**; any retained results are labeled as belonging to an earlier successful load. See [accessibility validation](ACCESSIBILITY.md) for tested coverage and remaining screen-reader verification.
+Choose a borough, then use the shared filters and numbered views to explore requests. The default is the last 30 days across that borough's permitted boards. Filters and the selected view are saved in the URL for sharing. **View data** opens a chart or map's table; **Reset filters** restores the defaults. If a request fails, use **Retry current view**. Any retained results are marked as stale.
 
 ## File an Issue 
 We're tracking all issues via this [repo's issue cue](https://github.com/BetaNYC/BoardStat/issues).
@@ -53,49 +34,30 @@ In the meantime, you can browse our training materials.
  * [BoardStat Training - Data Journey Worksheet](https://docs.google.com/document/d/1DHgVLrm-X1gs1rwovhpWA5En_ozcQnTWHYobmG9_B0A/edit) - This is the worksheet BetaNYC uses to teach BoardStat. You can find companion slides [here](http://bit.ly/betanyc_datajourney_manhattan).
  * [Training Videos](https://) - In development
  
-## Data and methodology
+## Data
 
-The borough dashboards query NYC Open Data's [2010–2019](https://data.cityofnewyork.us/Social-Services/311-Service-Requests-from-2010-to-2019/76ig-c548/about_data) and [2020–present](https://data.cityofnewyork.us/Social-Services/311-Service-Requests-from-2020-to-Present/erm2-nwe9/about_data) 311 datasets directly from the browser. Queries always constrain both the route borough and its permitted Community Board values. Date ranges crossing January 1, 2020 are split between the two datasets and compatible aggregate results are merged in the browser.
+BoardStat queries NYC Open Data's [2010–2019](https://data.cityofnewyork.us/Social-Services/311-Service-Requests-from-2010-to-2019/76ig-c548/about_data) and [2020–present](https://data.cityofnewyork.us/Social-Services/311-Service-Requests-from-2020-to-Present/erm2-nwe9/about_data) 311 datasets, filtered by borough and Community Board. Dates from January 1, 2010 through today are supported. Ranges crossing 2020 query both datasets and merge their results. Responses are cached for five minutes, with no background polling.
 
-Successful responses are reused in a bounded in-memory cache for up to five minutes; revisiting a view after expiry fetches fresh results. There is no background polling.
-
-Aggregation is pushed to Socrata with SoQL. The raw-request table and default map use bounded newest-first samples rather than downloading every matching record. High-cardinality rankings that span both datasets are explicitly labeled as leading candidates because each dataset must be ranked before its candidates can be merged. Exact totals and low-cardinality aggregates are not approximated.
+The request table and default map show the newest matching records, not every request or a representative sample. The map shows up to 250 requests per dataset; hotspot mode shows up to 100 locations. Address and hotspot rankings spanning both datasets are labeled as leading candidates because each dataset is ranked separately before merging. Totals and low-cardinality aggregates are exact. BoardStat uses the source's borough and board labels without independently geocoding them.
 
 ## Development
 
-Serve the repository without a build step:
-
-```bash
-python3 -m http.server 8000
-```
-
-Then open `http://localhost:8000/prototype.html` or a borough route. Run all dependency-free regression checks with:
+No build step is needed. Run `python3 -m http.server 8000` and open `http://localhost:8000/manhattan.html` (or another borough).
 
 ```bash
 node --test tests/*.test.mjs
+node tests/live-api-validation.mjs  # optional; queries NYC Open Data
 ```
 
-Run the optional live validation against NYC Open Data with `node tests/live-api-validation.mjs`. It is intentionally excluded from CI because it depends on an external public service.
+See [validation](VALIDATION.md), [accessibility](ACCESSIBILITY.md), and [deployment](DEPLOYMENT.md) for checks and known limitations. Production is served from `gh-pages`.
 
-See [accessibility validation](ACCESSIBILITY.md) for chart and map data alternatives, keyboard and color-vision checks, and remaining human screen-reader verification.
-
-### Worksheet workflow parity
-
-The live dashboard preserves its concise default views and loads the more expensive training-workflow analyses only when requested. Optional details include complaint/descriptor and address rankings, address-specific history, status by agency, calendar-month complaint mix, and a hotspot map mode.
-
-The default map remains a newest-first sample of up to 250 request markers per applicable dataset. Hotspot mode instead shows up to 100 high-volume aggregate locations. Rankings that span both NYC Open Data datasets are labeled as leading candidate results because each dataset must be queried independently before the browser merges them; exact totals and low-cardinality aggregate tables are not approximated.
-
-## Third-party software and services
-
-BoardStat loads pinned releases of Chart.js, Leaflet, Leaflet.markercluster, Esri Leaflet, and Esri Leaflet Vector from public CDNs. Static CDN assets include Subresource Integrity metadata. Map tiles are provided by Esri and OpenStreetMap contributors with visible attribution. Existing GA4 pageview measurement is retained in a separate document that receives no dashboard filters or referrer; previews send no analytics. jQuery is updated to 3.7.1; Popper, Bootstrap, Font Awesome, and NYC theme dependencies are preserved. Supported dates are January 1, 2010 through today. See `SECURITY.md` for browser protections and the remaining hosting-header work. See `THIRD_PARTY_NOTICES.md` for versions and licenses; self-hosted fonts and their SIL Open Font License are documented in `fonts/README.md`.
+Third-party libraries, maps, and fonts are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Production analytics receive a canonical page name without dashboard filters or a referrer; previews send no analytics. NYC Open Data receives the filters needed for queries. See [SECURITY.md](SECURITY.md) for details.
 
 ## AI assistance and human verification
 
-Generative AI tools, including OpenAI Codex, assisted with repository analysis, code and test drafting, debugging, and documentation for the browser-native migration. AI is not used at runtime and does not generate, classify, summarize, or alter the displayed 311 records or statistics; results are produced deterministically from Socrata queries.
+OpenAI Codex assisted with code, tests, debugging, documentation, and automated browser checks, using public repository content, documentation, and NYC 311 data. AI is not used at runtime and does not alter the displayed records or statistics.
 
-**Human verification status:** in progress. The draft contribution will not be represented as ready for production until a named human reviewer has inspected the implementation and validation evidence and accepted responsibility for the submission.
-
-The review record is retained in `VALIDATION.md`. This disclosure follows [BetaNYC's AI Policy](https://beta.nyc/about/ai-policy), including its transparency, methodology-documentation, source-verification, and human-review principles. Only public repository content, public documentation, and public NYC 311 data were used during AI-assisted work.
+**Human verification status:** in progress. A contributor walkthrough is recorded; independent review is pending. See the [validation record](VALIDATION.md) and [BetaNYC's AI Policy](https://beta.nyc/about/ai-policy).
 
 # Change Log
 

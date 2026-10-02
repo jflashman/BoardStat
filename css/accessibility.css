@@ -68,14 +68,13 @@ body {
   margin: .25rem;
 }
 
-.request-marker-shell {
+.request-marker-shell,
+.marker-cluster {
   display: grid;
   place-items: center;
 }
 
 .marker-cluster {
-  display: grid;
-  place-items: center;
   color: #050560;
   background: #b5dbff;
   border: 2px solid #050560;

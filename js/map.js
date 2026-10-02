@@ -3,7 +3,6 @@ const NYC_BASEMAP_URL = "https://tiles.arcgis.com/tiles/yG5s3afENB5iO9fj/arcgis/
 let map;
 let requestLayer;
 let hotspotLayer;
-let routeCenter = DEFAULT_CENTER;
 let fallbackBasemap;
 let renderGeneration = 0;
 
@@ -41,10 +40,10 @@ function addBasemap() {
   return layer;
 }
 
-function initializeMap() {
+function initializeMap(center) {
   if (map) return;
   requireLeaflet();
-  map = window.L.map("request-map", { scrollWheelZoom: false, maxZoom: 17 }).setView(routeCenter, 11);
+  map = window.L.map("request-map", { scrollWheelZoom: false, maxZoom: 17 }).setView(center, 11);
   addBasemap();
   requestLayer = window.L.markerClusterGroup({
     showCoverageOnHover: false,
@@ -59,6 +58,21 @@ function initializeMap() {
     },
   }).addTo(map);
   hotspotLayer = window.L.layerGroup().addTo(map);
+}
+
+function prepareMap(center, label) {
+  renderGeneration += 1;
+  initializeMap(center);
+  requestLayer.clearLayers();
+  hotspotLayer.clearLayers();
+  document.getElementById("request-map").setAttribute("aria-label", label);
+  return renderGeneration;
+}
+
+function fitMap(bounds, center) {
+  if (bounds.length) map.fitBounds(bounds, { padding: [48, 48], maxZoom: 15 });
+  else map.setView(center, 11);
+  window.setTimeout(() => map.invalidateSize(), 0);
 }
 
 function createRequestIcon() {
@@ -184,12 +198,7 @@ function createPopup(point) {
 }
 
 export function renderMapPoints(points, center = DEFAULT_CENTER) {
-  renderGeneration += 1;
-  routeCenter = center;
-  initializeMap();
-  requestLayer.clearLayers();
-  hotspotLayer.clearLayers();
-  document.getElementById("request-map").setAttribute("aria-label", "Map of recent 311 service requests");
+  const generation = prepareMap(center, "Map of recent 311 service requests");
   const body = mapDataTable(["Complaint", "Descriptor", "Agency", "Status", "Community Board", "Address", "Created", "Request", "Dataset", "Coordinates", "Map action"], "Mapped requests");
 
   const bounds = [];
@@ -212,7 +221,6 @@ export function renderMapPoints(points, center = DEFAULT_CENTER) {
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = `Show request ${point.unique_key || point.complaint_type || "at this location"} on map`;
-    const generation = renderGeneration;
     button.addEventListener("click", () => {
       requestLayer.zoomToShowLayer(marker, () => {
         if (generation === renderGeneration) marker.openPopup();
@@ -223,13 +231,7 @@ export function renderMapPoints(points, center = DEFAULT_CENTER) {
     bounds.push(location);
   });
 
-  if (bounds.length) {
-    map.fitBounds(bounds, { padding: [48, 48], maxZoom: 15 });
-  } else {
-    map.setView(routeCenter, 11);
-  }
-
-  window.setTimeout(() => map.invalidateSize(), 0);
+  fitMap(bounds, center);
   if (!bounds.length) dataRow(body, ["No mapped requests for this selection."]).firstElementChild.colSpan = 11;
   return bounds.length;
 }
@@ -247,12 +249,7 @@ function createHotspotPopup(hotspot) {
 }
 
 export function renderMapHotspots(result, center = DEFAULT_CENTER, loadDetails) {
-  const generation = ++renderGeneration;
-  routeCenter = center;
-  initializeMap();
-  requestLayer.clearLayers();
-  hotspotLayer.clearLayers();
-  document.getElementById("request-map").setAttribute("aria-label", "Map of 311 request hotspots");
+  const generation = prepareMap(center, "Map of 311 request hotspots");
   const body = mapDataTable(["Address", "Requests", "Coordinates", "Complaint details"], "Mapped hotspots");
   const bounds = [];
   const maximum = Math.max(...result.rows.map((row) => Number(row.count) || 0), 1);
@@ -290,7 +287,7 @@ export function renderMapHotspots(result, center = DEFAULT_CENTER, loadDetails) 
       });
       button.setAttribute("aria-disabled", "true");
       try {
-        if (!cached && !pending) {
+        if (!cached) {
           pending = Promise.resolve().then(() => loadDetails(hotspot));
         }
         const rows = cached || await pending;
@@ -330,9 +327,7 @@ export function renderMapHotspots(result, center = DEFAULT_CENTER, loadDetails) 
     bounds.push(location);
   });
 
-  if (bounds.length) map.fitBounds(bounds, { padding: [48, 48], maxZoom: 15 });
-  else map.setView(routeCenter, 11);
-  window.setTimeout(() => map.invalidateSize(), 0);
+  fitMap(bounds, center);
   if (!bounds.length) dataRow(body, ["No hotspots for this selection."]).firstElementChild.colSpan = 4;
   return bounds.length;
 }

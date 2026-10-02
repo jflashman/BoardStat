@@ -103,10 +103,11 @@ export function validateFilters(filters) {
   validateStringValues(filters.addresses || [], "addresses", 10);
 
   const currentYear = new Date().getFullYear();
-  if (!Array.isArray(filters.years || []) || (filters.years || []).length > currentYear - 2009) {
+  const years = filters.years || [];
+  if (!Array.isArray(years) || years.length > currentYear - 2009) {
     throw new TypeError("Choose valid years.");
   }
-  if ((filters.years || []).some((year) => !Number.isInteger(year) || year < 2010 || year > currentYear)) {
+  if (years.some((year) => !Number.isInteger(year) || year < 2010 || year > currentYear)) {
     throw new TypeError("Choose years from 2010 onward.");
   }
 
@@ -324,11 +325,11 @@ function mergeTupleCounts(resultSets, fields, makeRow) {
   ).sort((first, second) => second.count - first.count);
 }
 
-async function getDimensionBreakdown(filters, filterName, options) {
+async function getDimensionBreakdown(filters, filterName, options, omit = []) {
   const field = DIMENSIONS[filterName];
   const results = await querySlices(filters, (slice) => ({
     select: `${field}, count(*) AS count`,
-    where: buildWhere(filters, slice, [`${field} IS NOT NULL`]),
+    where: buildWhere(filters, slice, [`${field} IS NOT NULL`], { omit }),
     group: field,
     order: "count DESC",
     limit: FILTER_OPTION_LIMIT,
@@ -402,8 +403,7 @@ export async function getTimeline(filters, options) {
     group: "period",
     order: "period ASC",
   }), options);
-  const rows = mergeCounts(results, (row) => row.period, (period, count) => ({ period, count }))
-    .sort((first, second) => first.period.localeCompare(second.period));
+  const rows = mergeCounts(results, (row) => row.period, (period, count) => ({ period, count }));
   const counts = new Map(rows.map((row) => [row.period.slice(0, 10), row.count]));
   return { granularity, rows: rows.length ? timelinePeriods(filters, granularity).map((period) => ({
     period, count: counts.get(period.slice(0, 10)) || 0,
@@ -535,8 +535,12 @@ export async function getAgencyStatusBreakdown(filters, options) {
   );
 }
 
-function newestFirst(first, second) {
-  return String(second.created_date || "").localeCompare(String(first.created_date || ""));
+function mergeRequests(results) {
+  return results.flatMap(({ slice, rows }) => rows.map((row) => ({
+    ...row,
+    dataset: slice.dataset.id,
+    datasetLabel: slice.dataset.label,
+  }))).sort((first, second) => String(second.created_date || "").localeCompare(String(first.created_date || "")));
 }
 
 export async function getMapPoints(filters, options) {
@@ -546,11 +550,7 @@ export async function getMapPoints(filters, options) {
     order: "created_date DESC",
     limit: MAP_POINT_LIMIT,
   }), options);
-  return results.flatMap(({ slice, rows }) => rows.map((row) => ({
-    ...row,
-    dataset: slice.dataset.id,
-    datasetLabel: slice.dataset.label,
-  }))).sort(newestFirst);
+  return mergeRequests(results);
 }
 
 export async function getMapHotspots(filters, options) {
@@ -603,28 +603,15 @@ export async function getRecentRequests(filters, options) {
     order: "created_date DESC",
     limit: RECENT_REQUEST_LIMIT,
   }), options);
-  return results.flatMap(({ slice, rows }) => rows.map((row) => ({
-    ...row,
-    dataset: slice.dataset.id,
-    datasetLabel: slice.dataset.label,
-  })))
-    .sort(newestFirst)
-    .slice(0, RECENT_REQUEST_LIMIT);
+  return mergeRequests(results).slice(0, RECENT_REQUEST_LIMIT);
 }
 
 export async function getFilterOptions(filters, options) {
   const names = ["complaints", "descriptors", "agencies", "statuses"];
-  const entries = await Promise.all(names.map(async (filterName) => {
-    const field = DIMENSIONS[filterName];
-    const results = await querySlices(filters, (slice) => ({
-      select: `${field}, count(*) AS count`,
-      where: buildWhere(filters, slice, [`${field} IS NOT NULL`], { omit: [filterName] }),
-      group: field,
-      order: "count DESC",
-      limit: FILTER_OPTION_LIMIT,
-    }), options);
-    return [filterName, mergeDimensionCounts(results, field)];
-  }));
+  const entries = await Promise.all(names.map(async (filterName) => [
+    filterName,
+    await getDimensionBreakdown(filters, filterName, options, [filterName]),
+  ]));
   return Object.fromEntries(entries);
 }
 
